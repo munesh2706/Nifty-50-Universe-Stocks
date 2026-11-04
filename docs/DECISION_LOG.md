@@ -23,20 +23,20 @@ Record material product, architecture, data and trading-strategy decisions here.
 
 ---
 
-## Initial decisions
+## Accepted decisions
 
-### DEC-001 — Nifty 50 as the initial universe
+### DEC-001 — Nifty 50 as the initial underlying universe
 - **Status:** Accepted
 - **Date:** 2026-11-04
 - **Owner:** Munesh
-- **Decision:** The initial scanner universe is restricted to the 50 Nifty 50 constituents. Constituent membership must be maintained as versioned reference data rather than assumed permanently fixed.
-- **Consequences:** The system must support constituent updates and historical universe membership for unbiased backtests.
+- **Decision:** Scan all current Nifty 50 constituents. Maintain current and historical point-in-time membership as versioned reference data.
+- **Consequences:** The 50-stock cash scanner is independent of the smaller, dynamically changing stock-derivatives eligible universe.
 
 ### DEC-002 — Separate directional ranking from tradability
-- **Status:** Accepted as a design principle
+- **Status:** Accepted
 - **Date:** 2026-11-04
 - **Owner:** Munesh
-- **Decision:** Bullish/bearish ranking and entry tradability are separate stages. A strong directional stock is not automatically an actionable trade. The system must support a NO TRADE outcome.
+- **Decision:** Bullish/bearish ranking and entry tradability are separate stages. A strong directional stock is not automatically an actionable trade. The system must support NO TRADE.
 - **Consequences:** Selection and execution-readiness scores must be independently calculated, explained and tested.
 
 ### DEC-003 — Bounded agent collaboration
@@ -45,3 +45,70 @@ Record material product, architecture, data and trading-strategy decisions here.
 - **Owner:** Munesh
 - **Decision:** Use the No-Loop Protocol in `COLLABORATION_RULES.md`. After one proposal, one review and one revision, unresolved issues are escalated to the owner.
 - **Consequences:** No unbounded AI debate or silent scope changes.
+
+### DEC-004 — Angel One SmartAPI as initial provider
+- **Status:** Accepted
+- **Date:** 2026-11-04
+- **Owner:** Munesh
+- **Decision:** Use Angel One SmartAPI for initial live and historical market-data integration, including supported NSE cash and NFO instruments.
+- **Consequences:** Data adapter must respect documented API limits, WebSocket constraints, token lifecycle and historical interval request limits. Persist collected data locally; do not assume unlimited historical availability.
+
+### DEC-005 — 15-minute scanner and 5-minute setup timeframe
+- **Status:** Accepted
+- **Date:** 2026-11-04
+- **Owner:** Munesh
+- **Decision:** Use completed 15-minute candles for market regime and directional stock ranking; use completed 5-minute candles for market structure, order blocks, setup and entry analysis.
+- **Consequences:** No confirmed signal may depend on an incomplete candle. Tick/stream data can support live aggregation and display but must follow the canonical completed-bar contract.
+
+### DEC-006 — F&O derivative scope
+- **Status:** Accepted at product-scope level
+- **Date:** 2026-11-04
+- **Owner:** Munesh
+- **Decision:** Support stock futures and stock options as derivative instruments for signals generated from the Nifty 50 underlying universe.
+- **Consequences:** The scanner still displays all 50 underlyings. Derivative selection is conditional on active exchange-listed contracts, broker instrument master, permissions, liquidity and RMS restrictions. Do not assume all 50 have stock F&O contracts. Initial strategy specification proposes futures and long-option buying; option writing requires separate approval.
+
+### DEC-007 — One final candidate and both directions
+- **Status:** Accepted design direction
+- **Date:** 2026-11-04
+- **Owner:** Munesh
+- **Decision:** Display up to three bullish and three bearish candidates, then select one highest-tradability opportunity across both directions, or NO TRADE.
+- **Consequences:** Candidate ranking must not force a trade. A higher directional score alone does not override tradability gates.
+
+### DEC-008 — Shared live and backtest strategy engine
+- **Status:** Accepted
+- **Date:** 2026-11-04
+- **Owner:** Munesh
+- **Decision:** Live scanner, signal evaluation and historical replay/backtest must call the same deterministic feature, structure, scoring and signal-state implementation.
+- **Consequences:** Only data adapters and execution simulators may differ. Same data, code version and config must reproduce the same outputs.
+
+### DEC-009 — Signal persistence and configuration versioning
+- **Status:** Accepted
+- **Date:** 2026-11-04
+- **Owner:** Munesh
+- **Decision:** Persist each signal, lifecycle event, data references, feature values, score breakdown, strategy version, configuration snapshot/hash and outcome.
+- **Consequences:** Signals must be reproducible and auditable after restart or strategy changes.
+
+### DEC-010 — Eligibility before ranking
+- **Status:** Accepted design rule
+- **Date:** 2026-11-04
+- **Owner:** Munesh
+- **Decision:** Apply hard data-quality, instrument-availability and execution-eligibility filters before selecting top three in each direction. Promote the next eligible candidate. Show fewer than three if fewer qualify.
+- **Consequences:** Never pad the shortlist with ineligible or weak candidates.
+
+### DEC-011 — NO TRADE reason codes
+- **Status:** Accepted
+- **Date:** 2026-11-04
+- **Owner:** Munesh
+- **Decision:** Every NO TRADE result and rejected candidate must expose machine-readable reason codes and a human-readable explanation.
+- **Consequences:** Users can distinguish no directional edge, no fresh setup, invalidated setup, inadequate reward/risk, unavailable contract and unhealthy data.
+
+### DEC-012 — No automatic order placement in initial release
+- **Status:** Proposed safe scope pending owner confirmation
+- **Date:** 2026-11-04
+- **Owner:** Munesh
+- **Decision:** Initial release is a scanner, analysis and alerting tool. Automatic order placement is excluded until separately approved.
+- **Consequences:** No live orders may be placed by the application under this specification.
+
+## Research baseline (not empirically validated)
+
+See [STRATEGY_SPEC_V0.1.md](STRATEGY_SPEC_V0.1.md) for provisional directional scoring weights, SMC definitions, tradability score, derivative filters, data contracts and backtest methodology. These are test hypotheses, not approved profitability claims. Changes require evidence, versioning and regression tests.
