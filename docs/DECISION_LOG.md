@@ -106,12 +106,12 @@ Record material product, architecture, data and trading-strategy decisions here.
 - **Decision:** Every NO TRADE result and rejected candidate must expose machine-readable reason codes and a human-readable explanation.
 - **Consequences:** Users can distinguish no directional edge, no fresh setup, invalidated setup, inadequate reward/risk, unavailable contract and unhealthy data.
 
-### DEC-012 — No automatic order placement in initial release
-- **Status:** Proposed safe scope pending owner confirmation
+### DEC-012 — Decision-support only; no order execution in the project (owner trades manually)
+- **Status:** Accepted (owner-confirmed 2026-11-04)
 - **Date:** 2026-11-04
 - **Owner:** Munesh
-- **Decision:** Initial release is a scanner, analysis and alerting tool. Automatic order placement is excluded until separately approved.
-- **Consequences:** No live orders may be placed by the application under this specification.
+- **Decision:** The project is a stock-selection / decision-support and alerting tool only. It **never** places, routes or executes orders and involves no automated money action. The owner places any trades **manually** in their own broker terminal based on the tool's analysis. This is a permanent scope boundary, not a "pending approval" state.
+- **Consequences:** No live-trading / order-execution component is designed or built. There is no money action for any agent or the application to perform; the §4A "LIVE" state refers only to data-readiness for showing analysis, never to trade execution.
 
 ### DEC-013 — Decision authority model: owner delegates to joint co-owner agreement (Option C)
 - **Status:** Accepted
@@ -119,7 +119,7 @@ Record material product, architecture, data and trading-strategy decisions here.
 - **Owner:** Munesh
 - **Context:** Munesh designated ChatGPT and Claude as equal 50/50 technical co-owners. The open question (NO-001) was whether he retained a required sign-off over the three irreversible/capital-risk actions.
 - **Decision:** **Option C.** Munesh delegates to the two co-owners' **joint agreement** all decisions, including (1) merge to `main`, (2) authorizing a LIVE decision-support state, and (3) live-order authorization. He steps out of the routine approval loop. Both co-owners must still jointly agree on those three; neither acts unilaterally.
-- **Consequences / limits:** No-unilateral-merge, no-destructive-git and no-secrets safeguards remain. Delegating *authority* does not make either agent the *executor* of real-money actions: Claude will not execute live orders or fund transfers under any authorization; live-order execution (Gate 6, out of scope) must be performed by the human owner or a separately authorized non-Claude system. The owner may re-enter any decision at any time.
+- **Consequences / limits:** No-unilateral-merge, no-destructive-git and no-secrets safeguards remain. Per DEC-012 the project has no order-execution component at all, so "LIVE" authority here concerns only the data-readiness state for showing analysis — there is no real-money action for any agent or the app to take. The owner may re-enter any decision at any time.
 - **Revisit only if:** the owner changes the model, or a regulatory/operational constraint requires a human execution gate.
 
 ## Research baseline (not empirically validated)

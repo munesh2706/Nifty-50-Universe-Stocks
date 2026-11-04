@@ -10,7 +10,7 @@
 - **Scanner timeframe:** 15-minute
 - **Setup/entry-analysis timeframe:** 5-minute
 - **Derivative scope:** NSE individual-stock futures and options, subject to current contract availability and broker permissions
-- **Execution scope:** Decision support and alerts only. Live order placement is out of scope until separately approved.
+- **Execution scope:** Decision support and alerts **only**. This project never places, routes or executes orders and involves no automated money action. The owner acts on the tool's analysis by placing any trades **manually** in their own broker terminal. There is no live-trading component to build.
 
 This document separates owner-approved product decisions from provisional research parameters. Do not present provisional values as proven or immutable strategy rules.
 
@@ -547,7 +547,7 @@ Same input data + same code version + same config must reproduce the same result
 - **Gate 3 — Tradability and derivative mapping:** Add 5m entry state machine, contract eligibility and risk/cost estimates.
 - **Gate 4 — Historical replay:** Shared engine, realistic execution, bias controls and out-of-sample reports.
 - **Gate 5 — Paper observation:** Live shadow signals without order placement; compare live events with replay expectations.
-- **Gate 6 — Live execution:** Not authorised by this specification. Requires separate owner approval, broker/RMS checks and operational safeguards.
+- **Gate 6 — Live execution:** **Out of scope for this project.** The application never executes orders; the owner places any trades manually. No execution gate is built. (Retained here only to state explicitly that automated execution is not part of the system.)
 
 ## 16. Definition of done for strategy v0.2
 
