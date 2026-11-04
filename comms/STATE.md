@@ -12,7 +12,7 @@
 - **Status:** OWNER_APPROVED — v0.2 produced, awaiting owner merge decision
 - **Current round:** 1 of 1 — completed; owner approved 2026-11-04
 - **Turn:** OWNER
-- **Next action:** Owner approved the review/revision cycle. Claude has incorporated dispositions F1–F11 into `docs/STRATEGY_SPEC_V0.2.md` on branch `docs/strategy-spec-v0.2`. Two owner decisions remain: (1) whether/when to merge the `docs/strategy-spec-v0.2` branch to `main`, and (2) whether to activate Task 002 and/or start Gate 0. No agent may merge to main without explicit owner approval.
+- **Next action:** Owner approved the review/revision cycle. Claude incorporated F1–F11 into `docs/STRATEGY_SPEC_V0.2.md`, then applied the owner-directed timeframe finalization and two §7.3 determinism corrections (commit `572ee55` on `docs/strategy-spec-v0.2`; see the timeframe + §7.3 blocks below). Remaining owner decisions: (1) whether/when to merge `docs/strategy-spec-v0.2` to `main`; (2) whether to activate Task 002 and/or start Gate 0. No agent may merge to main without explicit owner approval.
 
 ## Artifact trail (this task)
 
@@ -22,6 +22,8 @@
 | 2 | Claude | review | comms/claude/001-strategy-spec-review.md | 1 |
 | 3 | ChatGPT | revision / finding dispositions F1–F11 | comms/chatgpt/001-strategy-spec-revision.md | 1 |
 | 4 | Claude | incorporation (owner-approved) | docs/STRATEGY_SPEC_V0.2.md @ docs/strategy-spec-v0.2 | — |
+| 5 | Claude | timeframe review | comms/claude/003-timeframe-decision-review.md | — |
+| 6 | Claude | timeframe finalization + §7.3 corrections | docs/* @ docs/strategy-spec-v0.2 (commit 572ee55) | — |
 
 ## Resolution
 
@@ -31,13 +33,20 @@
 - No unresolved Task 001 blocker is escalated to the owner in NEEDS_OWNER.md.
 - Owner approved the review/revision cycle on 2026-11-04. v0.2 exists on its branch but is **not** merged to main; no live-trading approval is implied. All v0.2 parameter values remain provisional hypotheses until backtested.
 
-## Side decision — timeframe lock (2026-11-04)
+## Decision 1 — timeframe finalized (2026-11-04, DONE on v0.2 branch)
 
 - **Question:** Lock strategy timeframe; ChatGPT recommended 5m + 15m vs a 1m + 5m alternative.
-- **Claude's independent review:** `comms/claude/003-timeframe-decision-review.md`.
-- **Recommendation (both agents aligned):** **5m + 15m as the sole configuration**; no parallel modes. Confirms v0.2 §A-03 — no spec-body change required.
-- **Conditions:** Gate 4 must quantify the 5m entry-delay penalty (entry slippage, MAE, max_entry_distance_atr rejection rate); a 1m execution-timing trigger within a confirmed 5m setup is the only sanctioned future timeframe experiment, at Gate 5 with measured benefit.
-- **Suggested owner record:** DEC-004 in docs/DECISION_LOG.md confirming 5/15, citing this review, when the owner next updates the spec/decision log.
+- **Claude's independent review:** `comms/claude/003-timeframe-decision-review.md` — challenged on entry delay, missed opportunities, stop distance, false signals, execution costs, data requirements and trade frequency.
+- **Decision (both agents aligned):** **5m + 15m as the sole configuration; 1/5 rejected; no parallel mode retained.** 1m only as a possible Gate 5 execution-timing experiment.
+- **Applied:** enriched **DEC-005** (not DEC-004 — DEC-004 is SmartAPI) with reasoning + trade-offs; updated PROJECT_VISION and README; fixed V0.1→V0.2 doc links broken by the rename. v0.2 §A-03 already stated 5/15, so no §A-03 text change was needed.
+- **Conditions:** Gate 4 must quantify the 5m entry-delay penalty (entry slippage vs OB boundary, MAE, max_entry_distance_atr rejection rate).
+
+## Decision 2 — §7.3 determinism corrections (2026-11-04, DONE on v0.2 branch)
+
+- **Issue C1 (owner-raised, Claude agrees):** the NEUTRAL double-break "bullish priority" rule was in fact impossible under close-based breaks. Replaced with `STRUCTURE_AMBIGUOUS_DOUBLE_BREAK`: on the degenerate overlap (latest swing low above latest swing high) emit no BOS and remain NEUTRAL, no directional priority.
+- **Issue C2 (owner-raised, Claude agrees):** protected-level-unavailable-after-CHoCH now explicit and consistent between prose and normative pseudocode — CHoCH stands, direction retained, protected level UNAVAILABLE with `protection_pending`/`STRUCTURE_PROTECTION_PENDING`; no further CHoCH until a continuation BOS repopulates it (pseudocode CHoCH check guarded by `protected != null`).
+- **Applied:** §7.3 rules + normative pseudocode rewritten; §15 Gate 2 fixtures added for both cases; §17 post-approval corrections table added; two new persisted structure-event codes documented.
+- **Note to ChatGPT:** both corrections adopted as you specified; C1 additionally notes *why* the old rule was unreachable, so the fixture asserts the degenerate-overlap case rather than a tie-break.
 
 ## Escalation
 
