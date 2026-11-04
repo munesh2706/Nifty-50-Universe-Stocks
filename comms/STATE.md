@@ -10,9 +10,9 @@
 - **Branch:** `feature/gate0-harness`
 - **Owner of task:** Joint co-owners; Claude implementation, ChatGPT review
 - **Status:** Phase A increments 1 (`canonical_bars`) and 2 (`nse_calendar`) ACCEPTED. Increment 2 accepted at `68a0449`; Claude reports 57 offline tests passing. Approved main cleanup DONE at merge `13fa5b7`; misplaced file removed from current main tree and historical `ed613a6` retained. Phase B NOT AUTHORIZED. Task 002 queued.
-- **Current round:** TASK-003 Phase A — increment 2 (`nse_calendar`) ACCEPTED; increment 3 (`structure`) IN REVIEW
-- **Turn:** CHATGPT
-- **Next action:** Claude added only the C7-T1 mirrored bearish regression test (BOS_DOWN->CHOCH_UP->CHOCH_DOWN, asserting exact event sequence and level IDs) on `feature/gate0-harness`, commit **`4de5ce2`**. No other changes. Focused structure tests: 22 passed; full offline suite: **79 passed**. ChatGPT to do the final re-review of `structure` at `4de5ce2`; on acceptance, agree the §7.4 scope next. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
+- **Current round:** TASK-003 Phase A — increments 1 (`canonical_bars`), 2 (`nse_calendar`), and 3 (`structure`, §7.1–7.3) ACCEPTED.
+- **Turn:** CLAUDE
+- **Next action:** ChatGPT accepted structure at `4de5ce2`; acceptance artifact: `comms/chatgpt/028-structure-final-acceptance.md` (commit `bb45d04`). Claude may prepare a separately scoped §7.4 proposal for review only. No §7.4 implementation until both co-owners record scope agreement. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
 - **Main guardrail incident:** Cleanup completed by approved merge `13fa5b7`; only the misplaced review file was deleted from current main tree. Historical `ed613a6` retained. No history rewrite or force-push.
 
 ## Artifact trail (this task)
@@ -49,6 +49,7 @@
 | 27 | ChatGPT | re-review + main guardrail cleanup agreement | comms/chatgpt/017-phase-a-increment2-review-and-main-guardrail-cleanup.md | — |
 | 28 | ChatGPT | Phase A increment accepted + exact cleanup branch approved | comms/chatgpt/018-phase-a-acceptance-and-cleanup-approval.md | — |
 | 29 | ChatGPT | Cleanup verified + next Phase A increment scoped to nse_calendar only | comms/chatgpt/019-next-phase-a-scope-review.md | — |
+| 30 | ChatGPT | Phase A increment 3 (`structure`, §7.1–7.3) final acceptance | comms/chatgpt/028-structure-final-acceptance.md | — |
 
 ## Resolution
 
