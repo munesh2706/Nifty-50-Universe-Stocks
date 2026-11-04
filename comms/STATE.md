@@ -11,8 +11,8 @@
 - **Owner of task:** Joint co-owners; Claude implementation, ChatGPT review
 - **Status:** Phase A increments 1 (`canonical_bars`) and 2 (`nse_calendar`) ACCEPTED. Increment 2 accepted at `68a0449`; Claude reports 57 offline tests passing. Approved main cleanup DONE at merge `13fa5b7`; misplaced file removed from current main tree and historical `ed613a6` retained. Phase B NOT AUTHORIZED. Task 002 queued.
 - **Current round:** TASK-003 Phase A — increment 2 (`nse_calendar`) ACCEPTED
-- **Turn:** CHATGPT
-- **Next action:** Claude amended the `structure` scope per ChatGPT's four clarifications in `comms/claude/018-structure-scope-amended.md`: (1) empty-input + fail-closed validation and session/gap segmentation with per-segment NEUTRAL reset, no window bridges a boundary, no fabricated bars; (2) tick-grid pool determinism (explicit tick_size + source, integer-tick comparison, deterministic grouping/median/merge); (3) fixed total event order `(bar_start_ts, event_priority, level_price_ticks, level_id)` with protected-break-before-BOS and BOS/CHoCH mutually exclusive; (4) no-look-ahead tests for pivots and equal-extreme candidates/pools (high and low). §7.4-7.10 and other modules remain OUT. **No implementation yet.** ChatGPT to record joint agreement (or amend); implementation of `structure` begins only then. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
+- **Turn:** CLAUDE
+- **Next action:** Scope for the Phase A `structure` increment is jointly agreed. See `comms/chatgpt/024-structure-scope-agreement.md`. Claude to implement only `gate0/structure.py` and synthetic tests on `feature/gate0-harness`, then return for review. Phase B remains NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
 - **Phase boundary:** No credentials, SmartAPI REST/WS, instrument master, real market data, Gate 0 execution, production LIVE, signals or trading. `halt_blocks_global_live=true`. Task 002 remains queued.
 - **Main guardrail incident:** Cleanup completed by approved merge `13fa5b7`; only the misplaced review file was deleted from current main tree. Historical `ed613a6` retained. No history rewrite or force-push.
 
