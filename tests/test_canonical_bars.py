@@ -53,9 +53,16 @@ def test_nan_in_each_field_rejected():
         assert "NON_FINITE_VALUE" in validate_bar(bar), kw
 
 
-def test_inf_rejected():
-    assert "NON_FINITE_VALUE" in validate_bar(make_bar(h=INF))
-    assert "NON_FINITE_VALUE" in validate_bar(make_bar(low=-INF))
+def test_inf_rejected_each_field_both_signs():
+    for kw in ("o", "h", "low", "c", "volume"):
+        assert "NON_FINITE_VALUE" in validate_bar(make_bar(**{kw: INF})), f"+inf {kw}"
+        assert "NON_FINITE_VALUE" in validate_bar(make_bar(**{kw: -INF})), f"-inf {kw}"
+
+
+def test_aggregate_rejects_mixed_complete_incomplete():
+    bars = make_5m_run(3)
+    mixed = [bars[0], make_bar(timeframe="5m", start=bars[1].bar_start_ts, is_complete=False), bars[2]]
+    assert aggregate_5m_to_15m(mixed) is None
 
 
 # --- R2 completed-bar contract ---
