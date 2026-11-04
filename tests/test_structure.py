@@ -231,6 +231,20 @@ def test_bos_consumed_pivot_still_usable_for_choch():
     # BOS_UP consumes A; CHOCH_DOWN breaks L; CHOCH_UP must still fire on A
     # (would be wrongly suppressed by a single global consumed set).
     assert types == [BOS_UP, CHOCH_DOWN, CHOCH_UP]
+    assert [e.level_id for e in events] == ["A", "L", "A"]
+
+
+def test_bos_down_consumed_pivot_still_usable_for_choch_down():
+    # Mirror of C7: BOS_DOWN(B) -> CHOCH_UP(H) -> CHOCH_DOWN(B); the low first
+    # consumed as the BOS_DOWN level is later the protected low and must still
+    # trigger the reverse CHOCH_DOWN.
+    t0 = NORMAL
+    B = Pivot("low", 10.0, t0, t0, "B")
+    H = Pivot("high", 30.0, t0, t0, "H")
+    seg = hlc_bars([(30, 5, 9), (31, 5, 31), (30, 5, 9)], start=NORMAL + timedelta(minutes=15))
+    events = _run_state_machine(seg, [B, H], TICK, 0)
+    assert [e.type for e in events] == [BOS_DOWN, CHOCH_UP, CHOCH_DOWN]
+    assert [e.level_id for e in events] == ["B", "H", "B"]
 
 
 # --- C8: even-member pool median uses integer ticks, rounded half up ---
