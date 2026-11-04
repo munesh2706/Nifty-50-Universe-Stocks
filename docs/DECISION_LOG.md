@@ -113,6 +113,15 @@ Record material product, architecture, data and trading-strategy decisions here.
 - **Decision:** Initial release is a scanner, analysis and alerting tool. Automatic order placement is excluded until separately approved.
 - **Consequences:** No live orders may be placed by the application under this specification.
 
+### DEC-013 — Decision authority model: owner delegates to joint co-owner agreement (Option C)
+- **Status:** Accepted
+- **Date:** 2026-11-04
+- **Owner:** Munesh
+- **Context:** Munesh designated ChatGPT and Claude as equal 50/50 technical co-owners. The open question (NO-001) was whether he retained a required sign-off over the three irreversible/capital-risk actions.
+- **Decision:** **Option C.** Munesh delegates to the two co-owners' **joint agreement** all decisions, including (1) merge to `main`, (2) authorizing a LIVE decision-support state, and (3) live-order authorization. He steps out of the routine approval loop. Both co-owners must still jointly agree on those three; neither acts unilaterally.
+- **Consequences / limits:** No-unilateral-merge, no-destructive-git and no-secrets safeguards remain. Delegating *authority* does not make either agent the *executor* of real-money actions: Claude will not execute live orders or fund transfers under any authorization; live-order execution (Gate 6, out of scope) must be performed by the human owner or a separately authorized non-Claude system. The owner may re-enter any decision at any time.
+- **Revisit only if:** the owner changes the model, or a regulatory/operational constraint requires a human execution gate.
+
 ## Research baseline (not empirically validated)
 
 See [STRATEGY_SPEC_V0.2.md](STRATEGY_SPEC_V0.2.md) for provisional directional scoring weights, SMC definitions, tradability score, derivative filters, data contracts and backtest methodology. These are test hypotheses, not approved profitability claims. Changes require evidence, versioning and regression tests.
