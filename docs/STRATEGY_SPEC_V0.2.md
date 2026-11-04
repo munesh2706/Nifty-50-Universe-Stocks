@@ -1,6 +1,8 @@
-# Strategy Specification — v0.1 (Research Baseline)
+# Strategy Specification — v0.2 (Research Baseline)
 
-- **Status:** Proposed technical baseline; scoring thresholds and SMC parameters are not yet empirically validated.
+- **Status:** Owner-approved research baseline. The Task 001 review/revision cycle is complete (owner approved 2026-11-04). Scoring thresholds and SMC parameters remain provisional and are not yet empirically validated.
+- **Supersedes:** v0.1 (`docs/STRATEGY_SPEC_V0.1.md` on branch `docs/strategy-spec-v0.1`).
+- **Incorporates:** Finding dispositions F1–F11 from `comms/chatgpt/001-strategy-spec-revision.md` (Claude review `comms/claude/001-strategy-spec-review.md`). See the changelog in section 17.
 - **Owner:** Munesh
 - **Market data provider:** Angel One SmartAPI
 - **Underlying universe:** Current Nifty 50 constituents
@@ -112,6 +114,7 @@ Initial regime labels:
 - RANGE: weak ADX and repeated overlap / no confirmed directional structure.
 - HIGH_VOLATILITY: ATR or realized range above a rolling percentile threshold.
 - CONFLICTED: trend, VWAP and structure materially disagree.
+- WARMUP (F11): the explicit state until all required inputs — opening range, indicator warm-up and confirmed structure — are available and timestamp-aligned. During WARMUP the engine must not emit BULL_TREND, BEAR_TREND or RANGE from incomplete inputs, must suppress countertrend ranking and actionable setups that depend on unavailable regime context, and must display the missing prerequisites. Transition to a normal regime only when required inputs are valid. Persist the WARMUP state and its transition time for replay parity.
 
 Regime is a context feature, not an absolute direction veto. Countertrend candidates may rank, but should require stronger structure/entry confirmation and can be disabled by configuration. Regime thresholds are provisional and must be tested.
 
@@ -121,7 +124,7 @@ Compute separate BULL_SCORE and BEAR_SCORE, each in [0,100]. The weights below a
 
 | Component | Weight | Example evidence |
 |---|---:|---|
-| Trend alignment | 25 | EMA 9/21/50 ordering, price vs VWAP, 15m slope |
+| Trend alignment | 25 | EMA 9/21/50 (provisional research set; see F9) ordering, price vs VWAP, 15m slope |
 | Relative strength / weakness | 20 | Stock return minus Nifty return over 15m/30m/60m; stock vs sector return |
 | Market structure | 20 | Confirmed HH/HL or LH/LL, BOS/CHoCH |
 | Volume participation | 15 | Time-of-day adjusted relative volume and directional candle participation |
@@ -134,6 +137,7 @@ Compute separate BULL_SCORE and BEAR_SCORE, each in [0,100]. The weights below a
 - Relative strength = stock percentage return minus benchmark percentage return over the same exact interval. Calculate multiple horizons; do not compare mismatched timestamps.
 - Sector comparison requires a versioned stock-to-sector mapping and valid sector index data. If sector data is absent, mark the feature unavailable and renormalize only according to an explicit missing-feature policy; do not silently score it as zero.
 - RVOL must compare cumulative or bar volume against the same time-of-day historical baseline, not a full-day average.
+- **RVOL baseline definition (F8, provisional, Gate-0 gated):** for each timeframe and time-of-day bucket, RVOL baseline = median volume of the same bucket over the previous 20 completed trading sessions, requiring at least 10 valid sessions, excluding the current session from its own baseline. These values are provisional pending the Gate 0 history-depth audit (see section 15), which must measure usable, gap-audited 5m/15m volume history per instrument (including recently added constituents and holiday-affected sessions) and record the actual valid-sample count per bucket. If fewer than the minimum valid sessions exist, mark RVOL **unavailable** (not zero); do not impute or silently treat missing RVOL as neutral. The missing-feature scoring policy for unavailable RVOL must be explicit and versioned before Gate 1 ranking is enabled; absent an approved policy, suppress any score component that depends on RVOL rather than fabricate one.
 - Indicator warm-up requirements must be satisfied before a stock is eligible.
 - Avoid double-counting correlated indicators. Preserve feature-level contributions for explanation.
 
@@ -146,7 +150,9 @@ Apply hard eligibility filters first:
 - No exchange/broker trading restriction or price-band condition that makes execution impractical.
 - For derivative tradability, at least one currently active and broker-accessible stock derivative contract must exist.
 
-Then rank eligible stocks. Initial directional score threshold: 65/100, provisional. Show up to three per direction; promote the next eligible name if a higher-ranked name fails a hard gate. A stock may appear in both lists only if the scoring model genuinely produces qualifying scores in both directions; otherwise enforce a configurable neutral band to prevent contradictory simultaneous labels.
+Then rank eligible stocks. Initial directional score threshold: 65/100, provisional. Show up to three per direction; promote the next eligible name if a higher-ranked name fails a hard gate.
+
+**Neutral band (F5, provisional).** Scores are on a 0–100 scale. Define `neutral_band_points = 5` in versioned configuration. A stock may appear on **both** directional lists only if both directional scores meet the qualifying threshold **and** `abs(BULL_SCORE - BEAR_SCORE) >= neutral_band_points`. If both scores qualify but `abs(BULL_SCORE - BEAR_SCORE) < 5`, classify the stock as directionally neutral and exclude it from both lists. A difference of exactly 5 points is outside the band, so the higher-scoring side may qualify and the lower side is suppressed. The band is measured in score points (not percent or price), is provisional, and must be sensitivity-tested — not tuned on the final holdout.
 
 ## 7. Deterministic market structure / SMC definitions (5m)
 
@@ -156,16 +162,72 @@ These are initial codeable definitions for research. They are not discretionary 
 
 A swing high at bar i is confirmed when its high is strictly greater than the highs of the two preceding and two following completed bars. A swing low is the inverse. The pivot becomes usable only after both right-side confirmation bars have closed. Store pivot_time and confirmation_time separately to prevent look-ahead.
 
+**Equal-extreme liquidity pools (F4).** The strict swing-pivot definition above is retained unchanged. Clean equal highs/lows (which produce no strict pivot) are handled by a **separate** deterministic equal-extreme detector, so resting liquidity at double-tops/bottoms is not lost:
+- An equal-high candidate at bar i is confirmed after its two right-side bars when its high is `>=` the highs of the two bars on each side, with at least one strict inequality in that five-bar window. Equal-low candidates use the inverse comparison.
+- Two or more confirmed candidates form an equal-high/low **pool** when their prices differ by no more than a configured tolerance. Initial tolerance: **one exchange tick** (store the tick-size source and value; do **not** use a floating-point epsilon). Wider tolerance is a research parameter for sensitivity testing — one tick is an engineering default, not a claim that all meaningful equal highs are exactly one tick apart.
+- A pool reference price is the **median** of its member candidate prices. Persist all member candidate IDs and the pool confirmation time. A pool is not available before its last required candidate is confirmed.
+- Merge overlapping pools deterministically only when their price ranges overlap within configured tolerance; retain constituent IDs and version the rule.
+- A swing pivot and an equal-extreme pool are distinct object types; downstream logic (BOS, sweeps) records which source it used.
+
 ### 7.2 BOS
 
 - Bullish BOS: a completed 5m candle closes above the latest confirmed swing high plus a configurable tick/ATR buffer.
 - Bearish BOS: a completed 5m candle closes below the latest confirmed swing low minus the buffer.
 - Wick-only breaches are not BOS.
 - A swing level may be broken once for a given structural event; duplicate signals must be suppressed.
+- **BOS vs CHoCH are mutually exclusive per completed bar and broken level (F2).** Which event a break produces depends on the structure state defined in §7.3. In a directional state the engine evaluates the **protected-level break first** (→ CHoCH), then a continuation break (→ BOS); it never emits both for the same bar/level event. If multiple same-direction levels are crossed by one bar, record the event against the level(s) qualified by the §7.3 state machine and suppress duplicate events for already-consumed level IDs.
 
-### 7.3 CHoCH
+### 7.3 CHoCH and the structure state machine (F1)
 
-CHoCH is the first confirmed close through the protected opposing swing that contradicts the current established structure. Define the current structure state explicitly (BULL, BEAR, NEUTRAL); do not infer CHoCH from a single candle colour or moving-average cross.
+CHoCH is the first confirmed close through the **protected** opposing swing that contradicts the current established structure. It is produced by a deterministic state machine with state ∈ {NEUTRAL, BULL, BEAR} plus a protected swing reference. Do not infer CHoCH from a single candle colour or moving-average cross. Only confirmed 5m pivots (§7.1) are eligible, and a pivot is not available until its two right-side confirmation bars have closed. All breaks include the configured tick/ATR buffer from §7.2.
+
+Rules:
+- In **NEUTRAL**, the first qualifying bullish BOS establishes BULL; the first qualifying bearish BOS establishes BEAR. The establishing event is **BOS**, not CHoCH.
+- On a bullish establishing BOS, set `protected_low` to the most recent confirmed swing low whose confirmation time is before the BOS bar close. On a bearish establishing BOS, set `protected_high` symmetrically. If no such pivot exists, do **not** establish directional state from that break; emit no structure event and wait for sufficient confirmed structure.
+- In **BULL**, the protected level is the swing low selected at the most recent bullish BOS. It stays protected until a later bullish BOS updates it — **a newer swing low by itself does not replace it.** A completed close below `protected_low` (incl. buffer) emits **CHoCH**, changes state immediately to BEAR, and sets `protected_high` to the most recent confirmed swing high before the CHoCH close.
+- In **BEAR**, apply the exact mirror: `protected_high` is selected at the most recent bearish BOS and stays fixed until that BOS updates it. A completed close above it emits CHoCH, flips state to BULL, and sets `protected_low` to the most recent confirmed swing low before the CHoCH close.
+- After a CHoCH the new state is active immediately; a subsequent break in the new direction is classified as BOS and updates its protected swing. This avoids an undefined intermediate state.
+- A missing protected pivot after a CHoCH is a **structure insufficiency**: retain the newly established direction but mark its protected level unavailable; do not fabricate one, and do not issue another CHoCH until a valid protected level exists.
+- Persist pivot IDs and confirmation timestamps, not just prices.
+
+Reference pseudocode (normative):
+
+```
+state = NEUTRAL
+protected_low = null
+protected_high = null
+
+for each completed 5m bar, chronologically:
+    use only pivots confirmed before this bar closes
+
+    if state == NEUTRAL:
+        if close breaks latest confirmed swing high:
+            candidate = latest confirmed swing low before this close
+            if candidate exists:
+                emit BOS_UP; state = BULL; protected_low = candidate
+        else if close breaks latest confirmed swing low:
+            candidate = latest confirmed swing high before this close
+            if candidate exists:
+                emit BOS_DOWN; state = BEAR; protected_high = candidate
+
+    else if state == BULL:
+        if close breaks protected_low:                      # evaluate protected break first
+            emit CHOCH_DOWN(protected_low); state = BEAR
+            protected_high = latest confirmed swing high before this close
+        else if close breaks latest confirmed swing high:
+            emit BOS_UP
+            protected_low = latest confirmed swing low before this close
+
+    else if state == BEAR:
+        if close breaks protected_high:
+            emit CHOCH_UP(protected_high); state = BULL
+            protected_low = latest confirmed swing low before this close
+        else if close breaks latest confirmed swing low:
+            emit BOS_DOWN
+            protected_high = latest confirmed swing high before this close
+```
+
+Edge case for fixtures: if a single wide-range bar closes beyond both the latest swing high and swing low while in NEUTRAL, the `if/else` above resolves the bullish break first; this tie-break is deliberate and must have a dedicated unit-test fixture.
 
 ### 7.4 Displacement
 
@@ -179,11 +241,11 @@ Initial test threshold: candle body >= 1.0 × ATR(14) is deliberately strict and
 
 ### 7.5 Order block
 
-- Bullish OB: the last bearish candle within a bounded lookback (initially up to five completed candles) before the qualifying bullish displacement that causes bullish BOS.
-- Bearish OB: the last bullish candle in the corresponding bearish sequence.
+- **Anchor and lookback (F3).** For a qualifying displacement sequence D1…Dn that causes BOS, the anchor is the **first candle of the sequence, D1** — not the later candle whose close confirms BOS. Search only the **five completed candles immediately preceding D1** (configurable lookback, provisional default 5). Do not include D1 or any later displacement/BOS-confirmation candle in the search window.
+- Bullish OB: the most recent **bearish** candle in that pre-D1 window. Bearish OB: the most recent **bullish** candle in that pre-D1 window.
 - Initial zone boundary: full high-low range of the OB candle. Store body-only boundaries as an alternate model for sensitivity tests.
-- Each zone stores source candle, creation time, direction, proximal/distal boundaries, linked BOS event, displacement metrics, optional FVG confluence and state.
-- If no qualifying opposite candle exists within the lookback, no OB is created.
+- Each zone stores: selected OB candle ID, D1 bar ID, displacement sequence IDs, linked BOS event ID, creation time, direction, proximal/distal boundaries, displacement metrics, lookback/config version, optional FVG confluence and state.
+- If no qualifying opposite candle exists within the pre-D1 window, no OB is created.
 
 ### 7.6 Fair value gap
 
@@ -195,7 +257,7 @@ For three consecutive completed candles A, B, C:
 
 ### 7.7 Liquidity sweep
 
-A sweep occurs when price trades beyond a confirmed swing high/low by a configurable buffer and the same completed candle or a defined subsequent completed candle closes back inside the prior level. Store the swept level, breach extreme, reclaim close and timestamps. Do not label every wick as a sweep.
+A sweep may reference either a confirmed strict swing (§7.1) or a confirmed equal-extreme liquidity pool (§7.1, F4). A sweep occurs when price trades beyond the reference level — a swing high/low, or a pool reference price — by a configurable sweep buffer and the same completed candle, or a defined subsequent completed candle within the configured reclaim window, closes back through the reference level. Store the swept level, whether its source was a **swing or a pool**, the breach extreme, reclaim close and timestamps. Do not label every wick as a sweep.
 
 ### 7.8 Mitigation and invalidation
 
@@ -212,6 +274,7 @@ Research baseline:
 - Bullish: price revisits an active bullish OB, then a completed 5m candle closes bullish and breaks the immediately preceding completed candle high; entry is considered on the next bar/available executable quote, not retroactively at the signal close.
 - Bearish: inverse.
 - Require no invalidation before entry and ensure the entry has not moved beyond the maximum permitted distance from the zone.
+- **Maximum entry distance (F10).** Express the maximum permitted entry distance from the OB zone as a multiple of 5m ATR(14), stored as numeric `max_entry_distance_atr` config. Use **0.5 ATR** only as an initial research value for fixtures/sensitivity testing, not a validated production threshold. Persist the ATR value, its calculation timestamp, the zone boundary and the measured distance used for each decision.
 - Compare OB midpoint entry, proximal-boundary entry and confirmation entry as separate test variants. Do not combine them into one undocumented rule.
 
 ### 7.10 Stop and target
@@ -219,7 +282,7 @@ Research baseline:
 - Structural stop: beyond the OB distal boundary plus a configurable volatility/tick buffer.
 - If the structural stop is too wide relative to ATR or available contract liquidity, reject the setup.
 - Primary target: next opposing confirmed swing/liquidity level, if present and objectively identified.
-- Require expected reward/risk >= 2.0 after estimated trading costs for the initial candidate gate.
+- **Reward/risk is instrument-type aware (F6).** The underlying structural R:R (initial threshold 2.0 after estimated costs) is the binding gate for the **futures** path only. For a **long option**, the underlying setup is directional context only; its price-based R:R does not map to the option's premium R:R, so the underlying R:R must not approve or reject the option. The binding option R:R gate is applied at contract selection (§9.3). Keep 2.0 provisional and validate separately for futures and long options.
 - If no defensible target exists, do not invent a fixed target; mark the setup ineligible or use a separately tested ATR target model.
 - Recompute reward/risk using the actual derivative instrument's executable bid/ask and costs at contract-selection stage.
 
@@ -239,7 +302,7 @@ Evaluate the six directional candidates independently. Initial weights are provi
 
 Initial hard gates:
 - Tradability score >= 70/100.
-- Net expected R multiple >= 2.0.
+- Net expected R multiple >= 2.0, applied **by instrument type (F6)**: on the underlying/futures R:R for the futures path; for the long-option path this gate is deferred to contract selection (§9.3) on the option's own premium-based R:R. Do not gate an option candidate on the underlying's price-based R:R.
 - Active, uninvalidated setup.
 - No stale/missing signal-critical data.
 - Valid entry, stop and target.
@@ -277,6 +340,8 @@ A separate contract score should compare eligible futures/options, using:
 - Margin/capital efficiency.
 - For options: delta suitability, theta decay, IV and expiry risk.
 - Broker RMS and exchange restrictions.
+
+**Binding option R:R gate (F6).** The long-option R:R gate is applied here, using the option's own executable premium entry/exit assumptions (bid/ask, slippage, costs) or a separately specified and empirically validated underlying-trigger/option-exit model. The option model must produce its own risk and reward values; never copy the underlying stop distance into premium. Until a defensible option-specific R:R estimate exists, the option contract is **ineligible** and the final outcome is NO_TRADE for that instrument path — do not silently waive the gate.
 
 Do not compare raw futures and option premium prices as if they were equivalent. If no contract is suitable, the underlying remains a directional candidate but the final result is NO_TRADE.
 
@@ -336,7 +401,7 @@ If reliable historical constituent or derivative contract history is unavailable
 - Signal generated at completed 5m close; fill no earlier than next executable event/bar under the selected fill model.
 - Use bid/ask or conservative spread/slippage model; do not assume every signal fills at candle close.
 - Model gaps, partial fills, liquidity limits, lot sizes, quantity freeze and expiry/rollover.
-- For options, backtest the actual historical option contract, not a synthetic payoff inferred solely from underlying candles.
+- For options, backtest the actual historical option contract, not a synthetic payoff inferred solely from underlying candles. **This is contingent on the Gate 0 expired-option history audit (F7).** If sufficient historical OHLC for expired individual-stock option contracts is unavailable from SmartAPI, do not claim an unbiased historical options backtest: mark the affected options backtest limited/unavailable (§11.2) and validate the options path **prospectively** through Gate 5 paper observation, unless a separately approved data source is added.
 
 ### 11.4 Required metrics
 
@@ -404,15 +469,15 @@ Same input data + same code version + same config must reproduce the same result
 
 ## 15. Implementation gates
 
-- **Gate 0 — Data audit:** Prove SmartAPI login, streaming, candle history, instrument master refresh, rate limiting, reconnect and persistence. No signals.
-- **Gate 1 — Scanner:** Build 50-stock table and 15m features; test data quality and ranking reproducibility.
-- **Gate 2 — Deterministic structure:** Implement pivots/BOS/CHoCH/OB/FVG as pure functions with hand-checked fixtures and no-look-ahead tests.
+- **Gate 0 — Data audit:** Prove SmartAPI login, streaming, candle history, instrument master refresh, rate limiting, reconnect and persistence. No signals. **Must additionally (F7, F8):** (a) test actual historical OHLC retrieval for a documented sample of **expired** individual-stock option contracts across expiries, strikes and dates, including contracts no longer in the current instrument master — recording requested vs returned candles, coverage dates, missing intervals, symbol/token resolution method, API errors/rate limits and reproducibility; and (b) measure usable, gap-audited 5m/15m **volume** history per instrument (including recently added constituents and holiday/missing-bar sessions) to settle the RVOL baseline sample counts of §6.1. These Gate 0 findings resolve F7/F8; they are not Gate 2 blockers.
+- **Gate 1 — Scanner:** Build 50-stock table and 15m features; test data quality and ranking reproducibility. Include the §6.2 neutral band (F5). RVOL scoring stays disabled until the F8 data audit and an approved missing-feature policy exist.
+- **Gate 2 — Deterministic structure:** Implement pivots/BOS/CHoCH/OB/FVG as pure functions with hand-checked fixtures and no-look-ahead tests. **Fixtures must cover both directions and (F1–F4):** NEUTRAL establishment, protected-swing selection, CHoCH reversal and immediate re-arming, multi-candle displacement OB anchoring on D1, equal-extreme liquidity pools, the NEUTRAL double-break tie-break, and no-look-ahead pivot confirmation.
 - **Gate 3 — Tradability and derivative mapping:** Add 5m entry state machine, contract eligibility and risk/cost estimates.
 - **Gate 4 — Historical replay:** Shared engine, realistic execution, bias controls and out-of-sample reports.
 - **Gate 5 — Paper observation:** Live shadow signals without order placement; compare live events with replay expectations.
 - **Gate 6 — Live execution:** Not authorised by this specification. Requires separate owner approval, broker/RMS checks and operational safeguards.
 
-## 16. Definition of done for strategy v0.1
+## 16. Definition of done for strategy v0.2
 
 The strategy specification is implementable when:
 - All owner decisions in section 14 needed for the relevant gate are resolved.
@@ -424,3 +489,23 @@ The strategy specification is implementable when:
 - Results can be reproduced from stored data/config/code versions.
 
 **No profitability claim is made by this document. All scoring weights, thresholds and setup rules remain hypotheses until independently validated.**
+
+## 17. Changelog — v0.1 → v0.2
+
+Incorporates the Task 001 review/revision dispositions (owner-approved 2026-11-04). Sources: `comms/claude/001-strategy-spec-review.md`, `comms/chatgpt/001-strategy-spec-revision.md`.
+
+| Finding | Change | Section |
+|---|---|---|
+| F1 | Added deterministic CHoCH structure state machine (NEUTRAL/BULL/BEAR, protected swing, normative pseudocode). | §7.3 |
+| F2 | BOS vs CHoCH made mutually exclusive and state-dependent; protected-level break evaluated before continuation. | §7.2, §7.3 |
+| F3 | Order-block anchor fixed to first displacement candle (D1); lookback is the 5 candles before D1. | §7.5 |
+| F4 | Retained strict swings; added separate equal-extreme liquidity-pool detector (one-tick tolerance, median reference); sweeps may reference swing or pool. | §7.1, §7.7 |
+| F5 | Defined neutral band = 5 score points with explicit dual-list rule. | §6.2 |
+| F6 | R:R gate made instrument-type aware; option R:R deferred to contract selection on premium, no silent waiver. | §7.10, §8, §9.3 |
+| F7 | Expired-option historical backtest made contingent on a Gate 0 audit; fallback to prospective Gate 5 validation. | §11.3, §15 |
+| F8 | RVOL baseline defined (median of same bucket over prior 20 sessions, min 10; unavailable≠zero) and Gate-0 gated. | §6.1, §15 |
+| F9 | Named EMA 9/21/50 as the provisional research set, distinct from index regime EMA 20/50. | §6 |
+| F10 | Maximum entry distance expressed as a 5m ATR(14) multiple (`max_entry_distance_atr`, initial 0.5). | §7.9 |
+| F11 | Added explicit WARMUP regime state that suppresses labels and countertrend ranking until inputs are valid. | §5 |
+
+All values introduced here remain provisional research parameters and must be sensitivity-tested; none is an approved production threshold or a profitability claim.
