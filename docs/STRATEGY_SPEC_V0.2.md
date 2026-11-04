@@ -141,7 +141,7 @@ Both co-owners agree on the *concept*: an **unverified gap** must block global L
 4. **Timeout / fail-safe:** if confirmation cannot be obtained within a bounded window (`nodata_confirm_timeout`), remain DEGRADED / NOT LIVE. Never promote on timeout.
 5. Global LIVE requires every constituent in a **known, verified state** — a validated completed candle, or a no-data condition that met this contract — with **zero UNKNOWN/unverified intervals**. Non-eligible symbols are shown with their reason code, never silently dropped.
 
-**Status:** concept jointly agreed; strict fail-closed default (`true`) adopted on ChatGPT's challenge. The human owner (Munesh) retains final say and may direct either default.
+**Status:** concept jointly agreed; strict fail-closed default (`true`) adopted on ChatGPT's challenge. The default remains fail-closed. Any later change to this default requires Gate 0 evidence and the explicit agreement of both co-owners, recorded in `comms/` (per DEC-013 / Option C); the owner may revise the standing delegation or product scope at any time.
 
 ### 4A.5 Readiness audit trail
 
