@@ -5,6 +5,7 @@ Covers ChatGPT scope-agreement 029 amendments 1-6.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 import pytest
 
@@ -48,8 +49,19 @@ def run(bars, structure, **kw):
 def test_atr_seed_and_wilder_update():
     seg = build(WARMUP + [(100.00, 100.25, 100.00, 100.10)])  # 15th TR = 0.25
     atr = _atr_series(seg)
-    assert atr[13] == pytest.approx(0.10)
-    assert atr[14] == pytest.approx(((0.10 * 13) + 0.25) / 14)
+    # Decimal, exact: 14 TRs of 0.10 -> seed exactly 0.10
+    assert atr[13] == Decimal("0.10")
+    assert isinstance(atr[13], Decimal)
+    assert atr[14] == (Decimal("0.10") * 13 + Decimal("0.25")) / Decimal(14)
+
+
+def test_d2_tr_and_atr_exact_decimal():
+    # non-round-looking price difference 100.10-100.00 is exactly Decimal('0.10')
+    # through TR seed and Wilder update (not a rounded binary float like 0.1).
+    seg = build(WARMUP + [(100.00, 100.10, 100.00, 100.10)])
+    atr = _atr_series(seg)
+    assert atr[13] == Decimal("0.10")
+    assert atr[14] == Decimal("0.10")  # another 0.10 TR keeps it exact
 
 
 # --- bullish / bearish single-candle qualification ---
@@ -288,6 +300,19 @@ def test_d3_bearish_multicandle():
 
 def test_d3_opposite_candle_interrupts():
     d1 = (100.00, 100.10, 100.00, 100.10)       # up
-    opp = (100.10, 100.15, 99.95, 100.00)       # down body -> breaks a bullish sequence
+    opp = (100.10, 100.15, 99.90, 100.00)       # open==close? no: open 100.10, close 100.00 -> down
     bars = build(WARMUP + [d1, opp])
-    assert run(bars, structure_for(bars[15], "up", 100.05)) == []
+    # level 99.95 is below the final close (100.00) so the BOS-close condition PASSES;
+    # the only reason no displacement is emitted is the opposite-body interruption.
+    assert run(bars, structure_for(bars[15], "up", 99.95)) == []
+
+
+def test_d3_post_gap_requires_14_new_trs():
+    seg_a = build(WARMUP, start=NORMAL)                                   # ends 10:25
+    gap_start = NORMAL + timedelta(minutes=5 * 15)                        # 10:30 (skips 10:25 slot)
+    # 13 prior TRs after the gap -> still ineligible
+    segb_bad = build(WARMUP[:13] + [(100.00, 101.00, 100.00, 101.00)], start=gap_start)
+    assert run(seg_a + segb_bad, structure_for(segb_bad[13], "up", 100.50)) == []
+    # 14 prior TRs after the gap -> eligible
+    segb_ok = build(WARMUP + [(100.00, 101.00, 100.00, 101.00)], start=gap_start)
+    assert len(run(seg_a + segb_ok, structure_for(segb_ok[14], "up", 100.50))) == 1

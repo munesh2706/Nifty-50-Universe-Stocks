@@ -70,27 +70,35 @@ def _bos_event_id(instrument: str, ev) -> str:
     return f"{instrument}:{ev.bar_start_ts.isoformat()}:{ev.type}"
 
 
-def _true_ranges(seg: list[Bar]) -> list[float]:
-    trs: list[float] = []
+def _true_ranges(seg: list[Bar]) -> list[Decimal]:
+    """True Range per bar, computed in Decimal from canonical bar values (D2).
+
+    Precision policy: all TR/ATR arithmetic uses the Decimal default context
+    (28 significant digits); no binary float is used until the public float
+    output fields are constructed.
+    """
+    trs: list[Decimal] = []
     for i, b in enumerate(seg):
+        h, l = Decimal(str(b.high)), Decimal(str(b.low))
         if i == 0:
-            trs.append(b.high - b.low)
+            trs.append(h - l)
         else:
-            pc = seg[i - 1].close
-            trs.append(max(b.high - b.low, abs(b.high - pc), abs(b.low - pc)))
+            pc = Decimal(str(seg[i - 1].close))
+            trs.append(max(h - l, abs(h - pc), abs(l - pc)))
     return trs
 
 
-def _atr_series(seg: list[Bar]) -> list[float | None]:
-    """Wilder ATR as-of each bar index; None before enough warm-up (index < 13)."""
+def _atr_series(seg: list[Bar]) -> list[Decimal | None]:
+    """Wilder ATR (Decimal) as-of each bar index; None before warm-up (index < 13)."""
     trs = _true_ranges(seg)
-    atr: list[float | None] = [None] * len(seg)
+    atr: list[Decimal | None] = [None] * len(seg)
+    period = Decimal(_ATR_PERIOD)
     if len(seg) >= _ATR_PERIOD:
-        seed = sum(trs[:_ATR_PERIOD]) / _ATR_PERIOD
+        seed = sum(trs[:_ATR_PERIOD], Decimal(0)) / period
         atr[_ATR_PERIOD - 1] = seed
         prev = seed
         for i in range(_ATR_PERIOD, len(seg)):
-            prev = ((prev * (_ATR_PERIOD - 1)) + trs[i]) / _ATR_PERIOD
+            prev = ((prev * (period - 1)) + trs[i]) / period
             atr[i] = prev
     return atr
 
@@ -214,8 +222,8 @@ def detect_displacement(
                 else (Decimal(str(first.open)) - Decimal(str(final.close)))
             if net_body_dec <= 0:
                 continue
-            atr_before = atr[d1 - 1]
-            threshold_dec = Decimal(str(displacement_atr_mult)) * Decimal(str(atr_before))
+            atr_before = atr[d1 - 1]  # Decimal
+            threshold_dec = Decimal(str(displacement_atr_mult)) * atr_before
             net_body = float(net_body_dec)
             threshold = float(threshold_dec)
             if net_body_dec >= threshold_dec:
@@ -229,7 +237,7 @@ def detect_displacement(
                     sequence_start_ts=first.bar_start_ts,
                     sequence_end_ts=final.bar_start_ts,
                     net_body=net_body,
-                    atr_value=atr_before,
+                    atr_value=float(atr_before),
                     atr_as_of_ts=seg[d1 - 1].bar_end_ts,
                     atr_mult=displacement_atr_mult,
                     threshold=threshold,
