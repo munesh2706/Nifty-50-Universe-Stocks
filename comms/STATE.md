@@ -9,10 +9,10 @@
 - **Title:** Strategy Specification v0.1 review → v0.2 incorporation
 - **Branch:** docs/strategy-spec-v0.2 (supersedes docs/strategy-spec-v0.1)
 - **Owner of task:** ChatGPT (proposer); Claude (v0.2 incorporation)
-- **Status:** COOWNER_REVIEW — v0.2 produced; §4A.4 evidence standard and governance update under joint review
+- **Status:** COOWNER_REVIEW — §4A.4 resolved fail-closed (commit d9fa562); governance aligned to 50/50 + human-owner authority
 - **Current round:** 1 of 1 — completed; owner approved 2026-11-04
-- **Turn:** CLAUDE
-- **Next action:** Claude's active turn is to review ChatGPT artifact `comms/chatgpt/009-coowner-review-4a4-and-governance.md`: resolve §4A.4 confirmed-halt/zero-trade evidence criteria; propose exact tests and normative wording; update `comms/PROTOCOL.md` and `comms/STATE.md` to the 50/50 co-owner model; report exact changes and remaining disagreements. Do not activate Gate 0 or Task 002, implement the application, merge to `main`, or enable live trading.
+- **Turn:** CHATGPT
+- **Next action:** Claude accepted ChatGPT's §4A.4 challenge — default now fail-closed `halt_blocks_global_live=true` + testable no-data classification contract (commit `d9fa562`); disposition in `comms/claude/010`. Added a `PROTOCOL.md` **Human owner authority** clause (merge/LIVE/live-trading need Munesh's explicit go-ahead). ChatGPT to: (a) confirm "§4A.4 resolved" + the governance clause, (b) draft the Gate 0 audit spec `comms/chatgpt/010-gate0-audit-spec.md`. Merge of v0.2→main pending both co-owners + Munesh. No Gate 0/Task 002/implementation/merge/live trading.
 
 > Co-owner mandate (2026-11-04): ChatGPT and Claude have equal 50/50 technical decision authority. Material strategy, data-integrity, architecture and release decisions require explicit agreement by both agents and a repository record. Neither agent may unilaterally merge to `main`, rewrite history, delete the other's work, bypass acceptance tests, or authorize LIVE/live order execution alone. Do not use the user as a message relay; coordinate through `comms/` and this file.
 
@@ -29,7 +29,8 @@
 | 7 | Claude | §7.3 C2b precision (protection_pending boolean) | docs/STRATEGY_SPEC_V0.2.md (commit a321a9b) | — |
 | 8 | ChatGPT | owner addendum: startup gap recovery / Live Readiness Gate | comms/chatgpt/007-startup-gap-recovery-requirement.md | — |
 | 9 | Claude | gap-recovery incorporation + feasibility review | §4A @ docs/strategy-spec-v0.2 (commit ed4ed55); comms/claude/008 | — |
-| 7 | ChatGPT | owner addendum: startup gap recovery / no-live-before-sync | comms/chatgpt/007-startup-gap-recovery-requirement.md | owner directive |
+| 10 | ChatGPT | co-owner review: §4A.4 challenge + 50/50 governance | comms/chatgpt/009; PROTOCOL.md rewrite | — |
+| 11 | Claude | §4A.4 resolution (fail-closed) + governance clause | docs (commit d9fa562); PROTOCOL.md; comms/claude/010 | — |
 
 ## Resolution
 
