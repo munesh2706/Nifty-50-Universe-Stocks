@@ -31,6 +31,14 @@
 - No unresolved Task 001 blocker is escalated to the owner in NEEDS_OWNER.md.
 - Owner approved the review/revision cycle on 2026-11-04. v0.2 exists on its branch but is **not** merged to main; no live-trading approval is implied. All v0.2 parameter values remain provisional hypotheses until backtested.
 
+## Side decision — timeframe lock (2026-11-04)
+
+- **Question:** Lock strategy timeframe; ChatGPT recommended 5m + 15m vs a 1m + 5m alternative.
+- **Claude's independent review:** `comms/claude/003-timeframe-decision-review.md`.
+- **Recommendation (both agents aligned):** **5m + 15m as the sole configuration**; no parallel modes. Confirms v0.2 §A-03 — no spec-body change required.
+- **Conditions:** Gate 4 must quantify the 5m entry-delay penalty (entry slippage, MAE, max_entry_distance_atr rejection rate); a 1m execution-timing trigger within a confirmed 5m setup is the only sanctioned future timeframe experiment, at Gate 5 with measured benefit.
+- **Suggested owner record:** DEC-004 in docs/DECISION_LOG.md confirming 5/15, citing this review, when the owner next updates the spec/decision log.
+
 ## Escalation
 
 - NEEDS_OWNER.md remains empty; no unresolved blocker requires an owner choice at this stage.
