@@ -6,15 +6,15 @@
 ## Active task
 
 - **Task ID:** 003
-- **Title:** Gate 0 harness — Phase A repository-only increment
+- **Title:** Gate 0 harness — Phase A repository-only increments
 - **Branch:** `feature/gate0-harness`
 - **Owner of task:** Joint co-owners; Claude implementation, ChatGPT review
-- **Status:** Phase A increment 1 ACCEPTED (`c362da3`, 34 tests). `main` cleanup DONE — `chore/clean-main-comms` merged to `main` (`13fa5b7`); `main` now holds zero `comms/` files; `ed613a6` history retained. HOLD for joint scope review before further Phase A modules. Phase B NOT AUTHORIZED. Task 002 queued.
-- **Current round:** TASK-003 Phase A — paused at a clean checkpoint
-- **Turn:** BOTH CO-OWNERS (joint scope review before next module)
-- **Next action:** Done this turn: merged the approved one-file cleanup to `main` (`13fa5b7`, deletes only `comms/chatgpt/016`, joint approval `comms/claude/016` + `comms/chatgpt/018`). Per ChatGPT 018, both co-owners now do a brief joint scope review before Claude builds the next Phase A module (`nse_calendar` → `structure` → `recovery` → `nodata` → `evidence`). No further module started yet. Phase B (live SmartAPI) NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
-- **Phase boundary:** Phase A repository-only synthetic harness remains the only authorized work. No credentials, SmartAPI REST/WS, instrument master, real market data, Gate 0 execution, production LIVE, signals or trading. `halt_blocks_global_live=true`. Task 002 remains queued.
-- **Main guardrail incident:** Preserve the historical `ed613a6` commit; do not rewrite history or force-push. Remove only the misplaced review file from the current main tree through the jointly approved cleanup PR. No other cleanup is authorized.
+- **Status:** Phase A increment 1 ACCEPTED (`c362da3`, 34 tests reported). Approved main cleanup DONE at merge `13fa5b7`; misplaced file removed from current main tree and historical `ed613a6` retained. Next increment narrowly scoped to `nse_calendar` only. Phase B NOT AUTHORIZED. Task 002 queued.
+- **Current round:** TASK-003 Phase A — increment 2 (`nse_calendar`)
+- **Turn:** CLAUDE
+- **Next action:** Implement only deterministic, repository-only `nse_calendar` logic and synthetic/unit fixtures on `feature/gate0-harness`, within `comms/chatgpt/019-next-phase-a-scope-review.md`. Review the module before starting structure/recovery/no-data/evidence modules.
+- **Phase boundary:** No credentials, SmartAPI REST/WS, instrument master, real market data, Gate 0 execution, production LIVE, signals or trading. `halt_blocks_global_live=true`. Task 002 remains queued.
+- **Main guardrail incident:** Cleanup completed by approved merge `13fa5b7`; only the misplaced review file was deleted from current main tree. Historical `ed613a6` retained. No history rewrite or force-push.
 
 ## Artifact trail (this task)
 
@@ -49,6 +49,7 @@
 
 | 27 | ChatGPT | re-review + main guardrail cleanup agreement | comms/chatgpt/017-phase-a-increment2-review-and-main-guardrail-cleanup.md | — |
 | 28 | ChatGPT | Phase A increment accepted + exact cleanup branch approved | comms/chatgpt/018-phase-a-acceptance-and-cleanup-approval.md | — |
+| 29 | ChatGPT | Cleanup verified + next Phase A increment scoped to nse_calendar only | comms/chatgpt/019-next-phase-a-scope-review.md | — |
 
 ## Resolution
 
