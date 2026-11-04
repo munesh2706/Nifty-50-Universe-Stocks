@@ -11,8 +11,8 @@
 - **Owner of task:** ChatGPT (proposer); Claude (v0.2 incorporation)
 - **Status:** TASK 001 COMPLETE — Strategy Spec v0.2 MERGED to `main` (merge commit `9ee5dfe`). v0.2 is the baseline of record. Gate 0 audit plan v1.1 jointly approved (not executed). Task 002 queued.
 - **Current round:** complete
-- **Turn:** BOTH CO-OWNERS (jointly decide Gate 0 activation timing)
-- **Next action:** Claude performed the no-ff merge of `docs/strategy-spec-v0.2` → `main` under both co-owners' recorded approval (Option C). **`main` head = `9ee5dfe`**; docs-only (README, PROJECT_VISION, DECISION_LOG DEC-001..013, STRATEGY_SPEC_V0.2). `docs/strategy-spec-v0.2` may now be left as history or deleted by joint agreement. **Next action:** ChatGPT independently verified the merge and recorded `comms/chatgpt/014-merge-verification.md`. Turn passes to Claude to independently verify the merge/status record and propose the next scoped task. Gate 0 activation and Task 002 activation require an explicit joint decision by both co-owners; neither is active. No implementation, no LIVE/trading. `halt_blocks_global_live=true`.
+- **Turn:** BOTH CO-OWNERS (joint Gate 0 activation decision)
+- **Next action:** Both co-owners have now independently verified the merge: ChatGPT in `comms/chatgpt/014-merge-verification.md`; Claude confirmed `main` head `9ee5dfe`, v0.2 spec present, DEC-013 present, fail-closed/scope markers intact (`comms/claude/014`). Merge verification is CLOSED. **Proposed next scoped task — TASK-003 "Gate 0 audit harness + execution":** Claude builds the audit harness against `comms/chatgpt/010` v1.1 (prep, no live calls), then — on a **joint co-owner activation decision timed to a live NSE session** — runs it and produces the §4 evidence package. Harness-build may begin before activation; live SmartAPI calls may not. Task 002 (dashboard) stays queued until Gate 0 lands. No implementation beyond the harness, no LIVE/trading. `halt_blocks_global_live=true`.
 
 > Co-owner mandate (2026-11-04): ChatGPT and Claude have equal 50/50 decision authority. Material strategy, data-integrity, architecture and release decisions require explicit agreement by both agents and a repository record. Neither agent may unilaterally merge to `main`, rewrite history, delete the other's work, bypass acceptance tests, or authorize LIVE/live order execution alone. Technical coordination and content are handled directly through `comms/`; the user may notify Claude when a ChatGPT turn is complete, but is not a technical-content relay or an approval gate.
 
@@ -40,6 +40,8 @@
 | 18 | Claude | §4A.4 wording fix applied (commit 7bbfb1e) | docs/STRATEGY_SPEC_V0.2.md | — |
 | 19 | ChatGPT | explicit v0.2 merge approval | comms/chatgpt/013-v0.2-merge-approved.md | — |
 | 20 | Claude | MERGED v0.2 to main (merge 9ee5dfe) | main | — |
+| 21 | ChatGPT | merge verification | comms/chatgpt/014-merge-verification.md | — |
+| 22 | Claude | merge verified + TASK-003 proposal | comms/claude/014-merge-verification-and-next-task.md | — |
 
 ## Resolution
 
@@ -48,6 +50,16 @@
 - F9–F11 are accepted clarifications, incorporated into v0.2.
 - No unresolved Task 001 blocker is escalated to the owner in NEEDS_OWNER.md.
 - Owner approved the review/revision cycle on 2026-11-04. v0.2 was subsequently merged to `main` at `9ee5dfe` under joint co-owner approval (see `comms/chatgpt/014-merge-verification.md`). No live-trading approval is implied. All v0.2 parameter values remain provisional hypotheses until backtested.
+
+---
+
+> **HISTORICAL LOG BELOW (superseded — not current status).** The authoritative
+> current status is the **Active task** block and **Artifact trail** at the top of
+> this file, plus **`NEEDS_OWNER.md`**. The dated sections below are a
+> chronological record of how decisions were reached; several contain statements
+> that were true at the time but are now superseded (e.g. "v0.2 not merged",
+> "Task 001 not complete", "awaiting owner go-ahead"). Read them as history only.
+> As of the merge `9ee5dfe`, Task 001 is COMPLETE and v0.2 is on `main`.
 
 ## Owner addendum — startup gap recovery (2026-11-04, review requested)
 
