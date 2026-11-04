@@ -6,13 +6,13 @@
 ## Active task
 
 - **Task ID:** 001
-- **Title:** Strategy Specification v0.1 review
-- **Branch:** docs/strategy-spec-v0.1
-- **Owner of task:** ChatGPT (proposer)
-- **Status:** AGREED (awaiting owner merge)
-- **Current round:** 1 of 1 — completed
+- **Title:** Strategy Specification v0.1 review → v0.2 incorporation
+- **Branch:** docs/strategy-spec-v0.2 (supersedes docs/strategy-spec-v0.1)
+- **Owner of task:** ChatGPT (proposer); Claude (v0.2 incorporation)
+- **Status:** OWNER_APPROVED — v0.2 produced, awaiting owner merge decision
+- **Current round:** 1 of 1 — completed; owner approved 2026-11-04
 - **Turn:** OWNER
-- **Next action:** Owner reviews the Claude review and ChatGPT revision, then decides whether to incorporate the amendments into docs/STRATEGY_SPEC_V0.1.md and merge the strategy-spec branch/PR. No agent may merge to main or merge the PR without explicit owner approval.
+- **Next action:** Owner approved the review/revision cycle. Claude has incorporated dispositions F1–F11 into `docs/STRATEGY_SPEC_V0.2.md` on branch `docs/strategy-spec-v0.2`. Two owner decisions remain: (1) whether/when to merge the `docs/strategy-spec-v0.2` branch to `main`, and (2) whether to activate Task 002 and/or start Gate 0. No agent may merge to main without explicit owner approval.
 
 ## Artifact trail (this task)
 
@@ -21,14 +21,15 @@
 | 1 | ChatGPT | proposal | docs/STRATEGY_SPEC_V0.1.md | 1 |
 | 2 | Claude | review | comms/claude/001-strategy-spec-review.md | 1 |
 | 3 | ChatGPT | revision / finding dispositions F1–F11 | comms/chatgpt/001-strategy-spec-revision.md | 1 |
+| 4 | Claude | incorporation (owner-approved) | docs/STRATEGY_SPEC_V0.2.md @ docs/strategy-spec-v0.2 | — |
 
 ## Resolution
 
-- F1–F6 have explicit deterministic/provisional resolutions in the revision artifact.
+- F1–F6 have explicit deterministic/provisional resolutions, now incorporated into `docs/STRATEGY_SPEC_V0.2.md` (see its §17 changelog).
 - F7 and F8 are explicitly deferred to Gate 0 data-feasibility audit; RVOL scoring remains disabled until its data and missing-feature policy are resolved.
-- F9–F11 are accepted clarifications.
+- F9–F11 are accepted clarifications, incorporated into v0.2.
 - No unresolved Task 001 blocker is escalated to the owner in NEEDS_OWNER.md.
-- AGREED means the review/revision cycle is complete and awaiting owner decision. It does not mean the strategy spec branch has been edited, merged, or approved for live trading.
+- Owner approved the review/revision cycle on 2026-11-04. v0.2 exists on its branch but is **not** merged to main; no live-trading approval is implied. All v0.2 parameter values remain provisional hypotheses until backtested.
 
 ## Escalation
 
@@ -45,6 +46,6 @@ BLOCKED_OWNER (see NEEDS_OWNER.md) · IDLE (no active task)
 - **Title:** Single-page live dashboard and instrument-detail design
 - **Proposal:** comms/chatgpt/002-live-dashboard-proposal.md
 - **Shared product brief:** comms/PRODUCT_BRIEF.md
-- **Status:** QUEUED
-- **Activation rule:** Do not activate Task 002 until the owner has reviewed Task 001 and explicitly confirms the next task may proceed. On the next ChatGPT turn after that confirmation, activate Task 002 and assign the review turn to Claude.
+- **Status:** QUEUED — eligible to activate (Task 001 owner-approved and v0.2 produced); awaiting owner's explicit go-ahead to proceed.
+- **Activation rule:** Owner has approved Task 001 but has not yet said "proceed to Task 002." On the owner's go-ahead, activate Task 002 (Status IN_REVIEW, Turn CLAUDE) so Claude reviews `comms/chatgpt/002-live-dashboard-proposal.md` against v0.2 and `comms/PRODUCT_BRIEF.md`.
 - **Scope reminder:** The strategy specification is a discussion/research baseline, not a locked implementation contract. Task 002 must be designed against the owner's product goal in comms/PRODUCT_BRIEF.md.
