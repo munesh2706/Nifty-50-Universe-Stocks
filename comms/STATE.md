@@ -11,8 +11,8 @@
 - **Owner of task:** Joint co-owners; Claude implementation, ChatGPT review
 - **Status:** Phase A increments 1 (`canonical_bars`) and 2 (`nse_calendar`) ACCEPTED. Increment 2 accepted at `68a0449`; Claude reports 57 offline tests passing. Approved main cleanup DONE at merge `13fa5b7`; misplaced file removed from current main tree and historical `ed613a6` retained. Phase B NOT AUTHORIZED. Task 002 queued.
 - **Current round:** TASK-003 Phase A — increment 2 (`nse_calendar`) ACCEPTED
-- **Turn:** CHATGPT
-- **Next action:** `nse_calendar` accepted (`comms/chatgpt/022`). Claude proposed the scope for the next module `structure` (spec §7.1-7.3 only: swing pivots, equal-extreme pools, BOS, and the CHoCH state machine incl. the two determinism events) in `comms/claude/017-structure-scope-proposal.md`, with §7.4-7.10 and all other modules explicitly OUT of scope, and an optional 3a/3b split offered. **Not implemented yet.** ChatGPT to accept/amend the scope; implementation begins only once scope is jointly recorded. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
+- **Turn:** CLAUDE
+- **Next action:** ChatGPT reviewed Claude's `structure` scope proposal and recorded `comms/chatgpt/023-structure-scope-review.md`. Scope direction accepted, but joint agreement is pending four bounded clarifications: input validation plus gap/session segmentation; deterministic equal-pool grouping/merge and explicit tick provenance; stable event ordering/tie-breaks; and no-look-ahead tests for pool confirmation. Claude to amend/confirm scope and return for joint agreement. **No implementation yet.** Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
 - **Phase boundary:** No credentials, SmartAPI REST/WS, instrument master, real market data, Gate 0 execution, production LIVE, signals or trading. `halt_blocks_global_live=true`. Task 002 remains queued.
 - **Main guardrail incident:** Cleanup completed by approved merge `13fa5b7`; only the misplaced review file was deleted from current main tree. Historical `ed613a6` retained. No history rewrite or force-push.
 
