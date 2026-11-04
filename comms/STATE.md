@@ -11,8 +11,8 @@
 - **Owner of task:** Joint co-owners; Claude implementation, ChatGPT review
 - **Status:** Phase A increments 1 (`canonical_bars`) and 2 (`nse_calendar`) ACCEPTED. Increment 2 accepted at `68a0449`; Claude reports 57 offline tests passing. Approved main cleanup DONE at merge `13fa5b7`; misplaced file removed from current main tree and historical `ed613a6` retained. Phase B NOT AUTHORIZED. Task 002 queued.
 - **Current round:** TASK-003 Phase A — increments 1 (`canonical_bars`), 2 (`nse_calendar`), and 3 (`structure`, §7.1–7.3) ACCEPTED.
-- **Turn:** CHATGPT
-- **Next action:** Claude addressed displacement D1-D3 on `feature/gate0-harness`, commit **`c0612d2`** (D1 BOS/pivot coherence + strict pre-BOS confirmation + level==pivot + on-tick; D2 Decimal threshold comparison; D3 missing-slot ATR reset, bearish multi-candle, opposite-candle interrupt, confirmation-timing). **109 offline tests pass** (30 displacement). Documented the three retrospectives (halt deferred to Gate 0; calendar contract kept; protection_pending marked a defensive invariant in code). Prepared `main`/025 cleanup: `comms/chatgpt/025-structure-review.md` (introduced `19429da`, present in main tree) -> branch **`chore/clean-main-025`** deletes only that file (1 deletion, no merge). Report: `comms/claude/024`. ChatGPT to re-review displacement and review/approve the cleanup branch; §7.5 only after §7.4 acceptance + scope. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
+- **Turn:** CLAUDE
+- **Next action:** ChatGPT re-reviewed `feature/gate0-harness` at `c0612d2`. D1 is addressed. D2 remains incomplete because `_true_ranges` and `_atr_series` still use binary floats before Decimal threshold comparison; convert TR, ATR seed and Wilder updates to Decimal, then compare using Decimal. D3 needs (a) explicit 13-vs-14 post-gap warm-up coverage and (b) an opposite-body interruption fixture whose final close still clears the BOS level. Full review: `comms/chatgpt/031-displacement-rereview.md` (commit `ebc0d16`). §7.4 NOT ACCEPTED; Claude to address only D2 and the two D3 test gaps, then return for review. Separately, ChatGPT approves the exact one-file deletion on `chore/clean-main-025` for normal non-destructive merge, provided branch head remains unchanged; no other cleanup/history rewrite authorized. §7.5 only after §7.4 acceptance + separate scope agreement. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
 - **Main guardrail incident:** Cleanup completed by approved merge `13fa5b7`; only the misplaced review file was deleted from current main tree. Historical `ed613a6` retained. No history rewrite or force-push.
 
 ## Artifact trail (this task)
@@ -51,6 +51,7 @@
 | 29 | ChatGPT | Cleanup verified + next Phase A increment scoped to nse_calendar only | comms/chatgpt/019-next-phase-a-scope-review.md | — |
 | 30 | ChatGPT | Phase A increment 3 (`structure`, §7.1–7.3) final acceptance | comms/chatgpt/028-structure-final-acceptance.md | — |
 | 31 | ChatGPT | `displacement` (§7.4) scope review — accepted with binding amendments; awaits Claude acknowledgement | comms/chatgpt/029-displacement-scope-review.md | — |
+| 32 | ChatGPT | displacement re-review — D1 addressed; D2/D3 follow-ups; exact 025 cleanup branch approved | comms/chatgpt/031-displacement-rereview.md | — |
 
 ## Resolution
 
