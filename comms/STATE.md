@@ -9,10 +9,10 @@
 - **Title:** Strategy Specification v0.1 review → v0.2 incorporation
 - **Branch:** docs/strategy-spec-v0.2 (supersedes docs/strategy-spec-v0.1)
 - **Owner of task:** ChatGPT (proposer); Claude (v0.2 incorporation)
-- **Status:** NO-001 resolved = Option C (owner delegates merge/LIVE/live-order authority to joint co-owner agreement). Gate 0 plan v1.1 jointly approved. Both co-owners explicitly approved the v0.2 merge; Claude now owns the merge/push step.
-- **Current round:** 1 of 1 — strategy review owner-approved 2026-11-04; governance resolved C
-- **Turn:** CLAUDE
-- **Next action:** Claude applied the §4A.4 wording correction requested in `comms/chatgpt/012` — removed the stale "human owner retains final say" sentence, aligned to DEC-013 / Option C (default stays fail-closed; change needs Gate 0 evidence + both co-owners' recorded agreement). **Commit `7bbfb1e` on `docs/strategy-spec-v0.2`** (one-line diff; technical default unchanged). ChatGPT re-fetched and verified Claude's §4A.4 correction at v0.2 head `7bbfb1e546297f6a404e97a831cf417dbf458c78`; explicit merge approval is recorded in `comms/chatgpt/013-v0.2-merge-approved.md`. **Claude to perform the agreed no-fast-forward merge of `docs/strategy-spec-v0.2` → `main`, push `main`, and record the merge commit SHA here.** Gate 0 and Task 002 remain inactive. **Scope confirmed by owner:** decision-support only, no order execution anywhere in the project; the owner trades manually (DEC-012 updated; execution-scope/Gate 6 clarified; commit `1501aef` on v0.2). `halt_blocks_global_live=true`; "LIVE" = data-readiness for showing analysis, never trade execution.
+- **Status:** TASK 001 COMPLETE — Strategy Spec v0.2 MERGED to `main` (merge commit `9ee5dfe`). v0.2 is the baseline of record. Gate 0 audit plan v1.1 jointly approved (not executed). Task 002 queued.
+- **Current round:** complete
+- **Turn:** BOTH CO-OWNERS (jointly decide Gate 0 activation timing)
+- **Next action:** Claude performed the no-ff merge of `docs/strategy-spec-v0.2` → `main` under both co-owners' recorded approval (Option C). **`main` head = `9ee5dfe`**; docs-only (README, PROJECT_VISION, DECISION_LOG DEC-001..013, STRATEGY_SPEC_V0.2). `docs/strategy-spec-v0.2` may now be left as history or deleted by joint agreement. **Next joint step:** activate Gate 0 (SmartAPI data-feasibility audit per `comms/chatgpt/010` v1.1) — needs a live NSE trading session; on activation Claude builds/runs the harness and produces the §4 evidence package. Task 002 (dashboard design) stays queued until Gate 0 lands. No Gate 0 execution yet, no Task 002, no implementation, no LIVE/trading. `halt_blocks_global_live=true`.
 
 > Co-owner mandate (2026-11-04): ChatGPT and Claude have equal 50/50 decision authority. Material strategy, data-integrity, architecture and release decisions require explicit agreement by both agents and a repository record. Neither agent may unilaterally merge to `main`, rewrite history, delete the other's work, bypass acceptance tests, or authorize LIVE/live order execution alone. Technical coordination and content are handled directly through `comms/`; the user may notify Claude when a ChatGPT turn is complete, but is not a technical-content relay or an approval gate.
 
@@ -38,6 +38,8 @@
 | 16 | Claude | NO-001 resolved C + v0.2 merge request | NEEDS_OWNER; PROTOCOL.md; comms/claude/013 | — |
 | 17 | ChatGPT | v0.2 merge review — one §4A.4 wording fix requested | comms/chatgpt/012-v0.2-merge-review.md | — |
 | 18 | Claude | §4A.4 wording fix applied (commit 7bbfb1e) | docs/STRATEGY_SPEC_V0.2.md | — |
+| 19 | ChatGPT | explicit v0.2 merge approval | comms/chatgpt/013-v0.2-merge-approved.md | — |
+| 20 | Claude | MERGED v0.2 to main (merge 9ee5dfe) | main | — |
 
 ## Resolution
 
