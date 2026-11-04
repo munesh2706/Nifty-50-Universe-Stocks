@@ -19,10 +19,19 @@ REGULAR_CLOSE = time(15, 30)
 WEEKEND = {5, 6}  # Mon=0 ... Sat=5, Sun=6
 
 
+class CalendarValidationError(ValueError):
+    """Raised when a CalendarData input is malformed. Fail-closed (C2)."""
+
+
 @dataclass(frozen=True)
 class CalendarData:
     """Versioned local calendar input. `holidays` and `early_closes` are supplied,
-    not discovered. `version`/`source` document provenance for the audit trail."""
+    not discovered. `version`/`source` document provenance for the audit trail.
+
+    Validated on construction (fail-closed): non-empty version/source, open earlier
+    than close, and every early close strictly after that day's open and no later
+    than the regular close.
+    """
 
     version: str
     source: str
@@ -30,6 +39,23 @@ class CalendarData:
     early_closes: dict[date, time] = field(default_factory=dict)  # date -> early close time
     open_time: time = REGULAR_OPEN
     close_time: time = REGULAR_CLOSE
+
+    def __post_init__(self) -> None:
+        if not (self.version and self.version.strip()):
+            raise CalendarValidationError("version must be a non-empty provenance string")
+        if not (self.source and self.source.strip()):
+            raise CalendarValidationError("source must be a non-empty provenance string")
+        if self.open_time >= self.close_time:
+            raise CalendarValidationError(
+                f"regular open {self.open_time} must be earlier than close {self.close_time}"
+            )
+        for d, ec in self.early_closes.items():
+            if ec <= self.open_time:
+                raise CalendarValidationError(f"early close {ec} on {d} must be after open {self.open_time}")
+            if ec > self.close_time:
+                raise CalendarValidationError(
+                    f"early close {ec} on {d} must be no later than regular close {self.close_time}"
+                )
 
 
 # A clearly-labelled SAMPLE for tests/dev only. NOT authoritative NSE data.
@@ -42,7 +68,11 @@ SAMPLE_CALENDAR = CalendarData(
 
 
 class TradingCalendar:
-    def __init__(self, data: CalendarData = SAMPLE_CALENDAR) -> None:
+    def __init__(self, data: CalendarData) -> None:
+        # C1: no implicit default. The caller must supply explicit, audited
+        # CalendarData; the synthetic SAMPLE_CALENDAR is never selected silently.
+        if not isinstance(data, CalendarData):
+            raise CalendarValidationError("TradingCalendar requires an explicit CalendarData")
         self.data = data
 
     def is_trading_day(self, d: date) -> bool:

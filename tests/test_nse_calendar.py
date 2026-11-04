@@ -3,8 +3,15 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 
+import pytest
+
 from gate0.canonical_bars import IST
-from gate0.nse_calendar import SAMPLE_CALENDAR, CalendarData, TradingCalendar
+from gate0.nse_calendar import (
+    SAMPLE_CALENDAR,
+    CalendarData,
+    CalendarValidationError,
+    TradingCalendar,
+)
 
 CAL = TradingCalendar(SAMPLE_CALENDAR)
 
@@ -82,3 +89,43 @@ def test_custom_calendar_data_version_recorded():
     assert cal.data.version == "test-1"
     # No holidays supplied -> a normal weekday trades.
     assert cal.is_trading_day(NORMAL)
+
+
+# --- C1: no silent synthetic default ---
+
+def test_trading_calendar_requires_explicit_data():
+    with pytest.raises(TypeError):
+        TradingCalendar()  # type: ignore[call-arg]
+
+
+def test_sample_calendar_must_be_passed_explicitly():
+    # Using the sample requires an explicit choice; it is never the default.
+    cal = TradingCalendar(SAMPLE_CALENDAR)
+    assert cal.data is SAMPLE_CALENDAR
+
+
+# --- C2: fail-closed config validation ---
+
+def test_empty_version_rejected():
+    with pytest.raises(CalendarValidationError):
+        CalendarData(version="", source="unit")
+
+
+def test_empty_source_rejected():
+    with pytest.raises(CalendarValidationError):
+        CalendarData(version="v", source="  ")
+
+
+def test_invalid_regular_bounds_rejected():
+    with pytest.raises(CalendarValidationError):
+        CalendarData(version="v", source="s", open_time=time(15, 30), close_time=time(9, 15))
+
+
+def test_early_close_before_open_rejected():
+    with pytest.raises(CalendarValidationError):
+        CalendarData(version="v", source="s", early_closes={date(2026, 11, 6): time(9, 0)})
+
+
+def test_early_close_after_regular_close_rejected():
+    with pytest.raises(CalendarValidationError):
+        CalendarData(version="v", source="s", early_closes={date(2026, 11, 6): time(16, 0)})
