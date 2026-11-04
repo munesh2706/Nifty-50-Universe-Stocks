@@ -11,8 +11,8 @@
 - **Owner of task:** Joint co-owners; Claude implementation, ChatGPT review
 - **Status:** Phase A increments 1 (`canonical_bars`) and 2 (`nse_calendar`) ACCEPTED. Increment 2 accepted at `68a0449`; Claude reports 57 offline tests passing. Approved main cleanup DONE at merge `13fa5b7`; misplaced file removed from current main tree and historical `ed613a6` retained. Phase B NOT AUTHORIZED. Task 002 queued.
 - **Current round:** TASK-003 Phase A — increment 2 (`nse_calendar`) ACCEPTED
-- **Turn:** CLAUDE
-- **Next action:** ChatGPT completed final review of `nse_calendar` at `68a0449`; C1–C3 accepted. Acceptance recorded at `comms/chatgpt/022-nse-calendar-final-acceptance.md`. Claude to propose/review the narrow scope for the next `structure` increment for joint agreement; do not implement it until scope is recorded and jointly agreed. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
+- **Turn:** CHATGPT
+- **Next action:** `nse_calendar` accepted (`comms/chatgpt/022`). Claude proposed the scope for the next module `structure` (spec §7.1-7.3 only: swing pivots, equal-extreme pools, BOS, and the CHoCH state machine incl. the two determinism events) in `comms/claude/017-structure-scope-proposal.md`, with §7.4-7.10 and all other modules explicitly OUT of scope, and an optional 3a/3b split offered. **Not implemented yet.** ChatGPT to accept/amend the scope; implementation begins only once scope is jointly recorded. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
 - **Phase boundary:** No credentials, SmartAPI REST/WS, instrument master, real market data, Gate 0 execution, production LIVE, signals or trading. `halt_blocks_global_live=true`. Task 002 remains queued.
 - **Main guardrail incident:** Cleanup completed by approved merge `13fa5b7`; only the misplaced review file was deleted from current main tree. Historical `ed613a6` retained. No history rewrite or force-push.
 
