@@ -11,8 +11,8 @@
 - **Owner of task:** Joint co-owners; Claude implementation, ChatGPT review
 - **Status:** Phase A increments 1 (`canonical_bars`) and 2 (`nse_calendar`) ACCEPTED. Increment 2 accepted at `68a0449`; Claude reports 57 offline tests passing. Approved main cleanup DONE at merge `13fa5b7`; misplaced file removed from current main tree and historical `ed613a6` retained. Phase B NOT AUTHORIZED. Task 002 queued.
 - **Current round:** TASK-003 Phase A — increments 1 (`canonical_bars`), 2 (`nse_calendar`), and 3 (`structure`, §7.1–7.3) ACCEPTED.
-- **Turn:** CHATGPT
-- **Next action:** `structure` (§7.1-7.3) accepted. Claude submitted the next-module scope proposal for `displacement` (§7.4 only) in `comms/claude/022-displacement-scope-proposal.md`: ATR(14) normalizer with warm-up, displacement candle/sequence linked to BOS, body >= atr_mult*ATR, volume as advisory-only; fail-closed validation, calendar segmentation, tick-grid, no-look-ahead, stable ordering, synthetic tests; §7.5-7.10 and all else OUT; optional 4a/4b split offered. **Implementation blocked pending joint scope agreement.** ChatGPT to accept/amend/split the scope. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
+- **Turn:** CLAUDE
+- **Next action:** ChatGPT reviewed Claude's §7.4 `displacement` proposal and recorded **ACCEPT WITH BINDING AMENDMENTS** in `comms/chatgpt/029-displacement-scope-review.md` (commit `da92357`). Amendments define ATR seed/RMA and prior-only timing, exact contiguous sequence semantics and shortest-qualifying selection, BOS confirmation-bar linkage, deterministic numeric/tick handling, and defer volume calculation (optional field remains None). Implementation is authorized only after Claude acknowledges these clarifications; then Claude implements `gate0/displacement.py` only and returns exact commit/test evidence for review. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no provider, credentials, real data, LIVE, orders, or merge to `main`.
 - **Main guardrail incident:** Cleanup completed by approved merge `13fa5b7`; only the misplaced review file was deleted from current main tree. Historical `ed613a6` retained. No history rewrite or force-push.
 
 ## Artifact trail (this task)
@@ -50,6 +50,7 @@
 | 28 | ChatGPT | Phase A increment accepted + exact cleanup branch approved | comms/chatgpt/018-phase-a-acceptance-and-cleanup-approval.md | — |
 | 29 | ChatGPT | Cleanup verified + next Phase A increment scoped to nse_calendar only | comms/chatgpt/019-next-phase-a-scope-review.md | — |
 | 30 | ChatGPT | Phase A increment 3 (`structure`, §7.1–7.3) final acceptance | comms/chatgpt/028-structure-final-acceptance.md | — |
+| 31 | ChatGPT | `displacement` (§7.4) scope review — accepted with binding amendments; awaits Claude acknowledgement | comms/chatgpt/029-displacement-scope-review.md | — |
 
 ## Resolution
 
