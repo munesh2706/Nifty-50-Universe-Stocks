@@ -182,13 +182,19 @@ def _pools(seg: list[Bar], instrument: str, tick: float, source: str) -> list[Po
 def _make_pool(kind, cluster, tick, source) -> list[Pool]:
     if len(cluster) < 2:
         return []
-    prices = sorted(c[1] for c in cluster)
-    n = len(prices)
-    med = prices[n // 2] if n % 2 else (prices[n // 2 - 1] + prices[n // 2]) / 2
-    med = round(med / tick) * tick
+    # C8: median computed in integer ticks with a documented deterministic rule:
+    # odd count -> middle tick; even count -> arithmetic mean of the two middle
+    # ticks, rounded HALF UP (toward the higher tick). No float round().
+    tks = sorted(c[0] for c in cluster)
+    n = len(tks)
+    if n % 2:
+        med_tick = tks[n // 2]
+    else:
+        med_tick = (tks[n // 2 - 1] + tks[n // 2] + 1) // 2  # (a+b)/2 rounded half up
+    reference_price = float(Decimal(med_tick) * Decimal(str(tick)))
     member_ids = tuple(sorted(c[3] for c in cluster))
     confirmation_time = max(c[2] for c in cluster)
-    return [Pool(kind, med, member_ids, confirmation_time, tick, source)]
+    return [Pool(kind, reference_price, member_ids, confirmation_time, tick, source)]
 
 
 def _run_state_machine(seg: list[Bar], pivots: list[Pivot], tick: float, buffer_ticks: int) -> list[StructureEvent]:
@@ -197,7 +203,10 @@ def _run_state_machine(seg: list[Bar], pivots: list[Pivot], tick: float, buffer_
     protected_low: Pivot | None = None
     protected_high: Pivot | None = None
     protection_pending = False
-    consumed: set[str] = set()  # C1: levels already turned into an event
+    # C1 + C7: consumption is event-scoped. A pivot consumed as a BOS level must
+    # still be usable later as a CHoCH protected level (and vice versa).
+    consumed_bos: set[str] = set()
+    consumed_choch: set[str] = set()
     events: list[StructureEvent] = []
 
     for b in seg:
@@ -210,20 +219,20 @@ def _run_state_machine(seg: list[Bar], pivots: list[Pivot], tick: float, buffer_
         if state == "NEUTRAL":
             if broke_high and broke_low:
                 events.append(StructureEvent(AMBIGUOUS_DOUBLE_BREAK, ts, "none", sh.price, sh.pivot_id, sl.pivot_id))
-            elif broke_high and sl is not None and sh.pivot_id not in consumed:
+            elif broke_high and sl is not None and sh.pivot_id not in consumed_bos:
                 events.append(StructureEvent(BOS_UP, ts, "up", sh.price, sh.pivot_id))
-                consumed.add(sh.pivot_id)
+                consumed_bos.add(sh.pivot_id)
                 state, protected_low, protection_pending = "BULL", sl, False
-            elif broke_low and sh is not None and sl.pivot_id not in consumed:
+            elif broke_low and sh is not None and sl.pivot_id not in consumed_bos:
                 events.append(StructureEvent(BOS_DOWN, ts, "down", sl.price, sl.pivot_id))
-                consumed.add(sl.pivot_id)
+                consumed_bos.add(sl.pivot_id)
                 state, protected_high, protection_pending = "BEAR", sh, False
 
         elif state == "BULL":
             if (not protection_pending) and protected_low is not None \
-                    and close < protected_low.price - buffer and protected_low.pivot_id not in consumed:
+                    and close < protected_low.price - buffer and protected_low.pivot_id not in consumed_choch:
                 events.append(StructureEvent(CHOCH_DOWN, ts, "down", protected_low.price, protected_low.pivot_id))
-                consumed.add(protected_low.pivot_id)
+                consumed_choch.add(protected_low.pivot_id)
                 state = "BEAR"
                 newsh = _confirmed_before(pivots, "high", ts)
                 if newsh is None:
@@ -231,17 +240,17 @@ def _run_state_machine(seg: list[Bar], pivots: list[Pivot], tick: float, buffer_
                     events.append(StructureEvent(PROTECTION_PENDING, ts, "down", None, None))
                 else:
                     protected_high, protection_pending = newsh, False
-            elif broke_high and sh.pivot_id not in consumed:
+            elif broke_high and sh.pivot_id not in consumed_bos:
                 events.append(StructureEvent(BOS_UP, ts, "up", sh.price, sh.pivot_id))
-                consumed.add(sh.pivot_id)
+                consumed_bos.add(sh.pivot_id)
                 newsl = _confirmed_before(pivots, "low", ts)
                 protected_low, protection_pending = newsl, newsl is None
 
         elif state == "BEAR":
             if (not protection_pending) and protected_high is not None \
-                    and close > protected_high.price + buffer and protected_high.pivot_id not in consumed:
+                    and close > protected_high.price + buffer and protected_high.pivot_id not in consumed_choch:
                 events.append(StructureEvent(CHOCH_UP, ts, "up", protected_high.price, protected_high.pivot_id))
-                consumed.add(protected_high.pivot_id)
+                consumed_choch.add(protected_high.pivot_id)
                 state = "BULL"
                 newsl = _confirmed_before(pivots, "low", ts)
                 if newsl is None:
@@ -249,9 +258,9 @@ def _run_state_machine(seg: list[Bar], pivots: list[Pivot], tick: float, buffer_
                     events.append(StructureEvent(PROTECTION_PENDING, ts, "up", None, None))
                 else:
                     protected_low, protection_pending = newsl, False
-            elif broke_low and sl.pivot_id not in consumed:
+            elif broke_low and sl.pivot_id not in consumed_bos:
                 events.append(StructureEvent(BOS_DOWN, ts, "down", sl.price, sl.pivot_id))
-                consumed.add(sl.pivot_id)
+                consumed_bos.add(sl.pivot_id)
                 newsh = _confirmed_before(pivots, "high", ts)
                 protected_high, protection_pending = newsh, newsh is None
 

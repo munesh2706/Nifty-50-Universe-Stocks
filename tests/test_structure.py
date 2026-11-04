@@ -15,6 +15,7 @@ from gate0.structure import (
     BOS_DOWN,
     BOS_UP,
     CHOCH_DOWN,
+    CHOCH_UP,
     Pivot,
     _run_state_machine,
     _segment,
@@ -216,3 +217,34 @@ def test_pivot_window_does_not_bridge_gap():
     right = hlc_bars([(20, 10, 15), (20, 10, 15)], start=EARLY)
     res = run(left + right)
     assert all(p.price != 30.0 for p in res.pivots)
+
+
+# --- C7: consumption is event-scoped (BOS-consumed pivot still usable for CHoCH) ---
+
+def test_bos_consumed_pivot_still_usable_for_choch():
+    t0 = NORMAL
+    A = Pivot("high", 30.0, t0, t0, "A")  # confirmed early
+    L = Pivot("low", 10.0, t0, t0, "L")
+    seg = hlc_bars([(31, 5, 31), (31, 5, 9), (31, 5, 31)], start=NORMAL + timedelta(minutes=15))
+    events = _run_state_machine(seg, [A, L], TICK, 0)
+    types = [e.type for e in events]
+    # BOS_UP consumes A; CHOCH_DOWN breaks L; CHOCH_UP must still fire on A
+    # (would be wrongly suppressed by a single global consumed set).
+    assert types == [BOS_UP, CHOCH_DOWN, CHOCH_UP]
+
+
+# --- C8: even-member pool median uses integer ticks, rounded half up ---
+
+def test_even_member_pool_median_round_half_up():
+    rows = []
+    for i in range(11):
+        if i == 2:
+            rows.append((100.00, 40.0, 45.0))
+        elif i == 8:
+            rows.append((100.05, 40.0, 45.0))  # 1 tick apart -> one pool, 2 members
+        else:
+            rows.append((99.00, 40.0, 44.0))
+    res = run(hlc_bars(rows))
+    pool = next(p for p in res.pools if p.kind == "high")
+    assert len(pool.member_ids) == 2
+    assert pool.reference_price == 100.05  # (2000t + 2001t)/2 rounded half up -> 2001t
