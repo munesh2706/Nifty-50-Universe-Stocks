@@ -1,6 +1,6 @@
 # Gate 0 — SmartAPI Data Feasibility Audit Specification
 
-**Status:** Proposal for independent co-owner review. This document defines an audit plan only; it does not activate Gate 0, authorize application implementation, merge, LIVE, or trading.
+**Status:** v1.1 — amended after Claude's independent review A1–A6. This document defines an audit plan only; it does not activate Gate 0, authorize application implementation, merge, LIVE, or trading.
 
 **Authors:** ChatGPT proposal; Claude independent reviewer.
 **Baseline:** `docs/STRATEGY_SPEC_V0.2.md`, especially §§3, 4A, 6.1, 11.3 and 15.
@@ -24,12 +24,16 @@
 
 ## 2. Preconditions and controls
 
+**Live-session requirement:** Gate 0 must span at least one complete live NSE trading session; target 2–3 sessions where scheduling permits. Publication-delay measurement (Workstream D) and live-session portions of recovery scenarios E1 and E9 require observation during actual market hours and cannot be reconstructed from historical candles. Include a high-volatility session if one occurs in the observation window; do not claim this condition was tested if it did not occur. If the live-session evidence is unavailable, mark the affected tests NOT PROVEN.
+
+**Shared historical sample (A1):** Use one common historical pull covering at least **20 completed trading sessions** for all 50 constituents on both 5m and 15m. Reuse this exact validated dataset for Workstreams C and H (F8); do not issue duplicate deep pulls for the same coverage/RVOL audit. Workstream G (expired options) remains a separate contract-specific sample.
+
 Before execution, record:
 - Audit run ID; operator; start/end timestamps; code commit; dependency versions; configuration hash.
 - SmartAPI account/product permissions and documented endpoint versions.
 - Exchange calendar/version and point-in-time Nifty 50 constituent list.
 - Instrument-master source, retrieval timestamp, file hash, parser version and token mapping output.
-- Network environment and machine clock synchronisation status.
+- Network environment, machine clock synchronisation status, trusted time reference, measured clock offset and configured `max_clock_skew_seconds` readiness threshold.
 - API request/response metadata, status codes, latency, rate-limit observations and sanitized error bodies.
 
 Secrets, JWTs, API keys, client codes and personal account data must never enter the repository. Store only redacted evidence and hashes. Preserve raw response samples securely outside Git where they contain account or sensitive data; commit reproducible sanitized extracts and audit summaries.
@@ -59,8 +63,8 @@ Every test must state its sample, method, expected result, observed result, evid
 **Pass condition:** every required constituent has one unambiguous, source-backed mapping for the audit period; refresh and change detection are reproducible. Any unresolved mapping is FAIL/PARTIAL and blocks readiness.
 
 ### C. Historical OHLCV coverage and canonical-bar validation
-For all 50 constituents and both 5m and 15m:
-- Request a documented, representative sample spanning multiple recent trading sessions, including session open/close, high-activity and low-activity periods, and known holidays/non-trading days around the sample.
+For all 50 constituents and both 5m and 15m, use the shared ≥20 completed-session pull specified in §2; this same dataset supplies Workstream H's F8 analysis.
+- Request a documented, representative sample spanning those sessions, including session open/close, high-activity and low-activity periods, and known holidays/non-trading days around the sample.
 - Record requested ranges versus returned ranges, count expected versus returned bars using the exchange calendar, first/last timestamps, duplicates, ordering, missing intervals, partial responses and repeat-query consistency.
 - Validate timezone, bar-start/bar-end convention, OHLC relationships, positive prices, volume semantics, session boundaries and completed/forming-bar treatment.
 - Repeat selected requests to detect revisions or non-deterministic historical responses.
@@ -74,15 +78,15 @@ For all 50 constituents and both 5m and 15m:
 - Determine whether the feed exposes trades, quotes, snapshots or another event type; document what can and cannot be inferred from silence.
 - Build canonical 5m/15m bars from stream events and compare them with historical REST bars for identical intervals.
 - Establish exact exchange-time boundary handling, volume accumulation/reset semantics, duplicate/out-of-order event handling and session-final-bar behaviour.
-- Measure REST historical candle publication delay after candle close over a repeated sample. Record median, p95, p99 and maximum observed delay, sample size and observation window; do not turn observed maxima into guarantees.
+- During the live-session observation window in §2, measure REST historical candle publication delay after candle close over a repeated sample. Record median, p95, p99 and maximum observed delay, sample size and observation window; do not turn observed maxima into guarantees. Historical replay cannot substitute for this measurement.
 - Simulate a disconnect during an interval, reconnect, REST backfill while stream events are buffered, overlap reconciliation and chronological replay. Prove no missing or double-counted event/bar at the seam.
 - Test a healthy connection with a deliberately unsubscribed or invalid token to prove that connection health alone cannot certify per-symbol feed continuity.
 
 **Critical limitation:** WebSocket silence is not evidence of zero trades unless the feed's event semantics, subscription acknowledgement, per-symbol continuity and staleness detection are positively demonstrated. If SmartAPI cannot expose sufficient evidence, zero-trade classification remains unavailable and the interval is UNKNOWN.
 
 ### E. Startup and gap-recovery feasibility (§4A)
-Execute the following controlled scenarios using a test harness, not a live trading application:
-1. Start approximately 30 minutes after the session begins.
+Execute the following controlled scenarios using an isolated test harness, not a live trading application. Scenarios 1 and 9 require live-session execution/observation; they cannot be validated from historical replay alone:
+1. During a live NSE session, start approximately 30 minutes after the session begins.
 2. Cold start on the next trading day after a long absence; confirm nights, weekends and holidays are not treated as gaps.
 3. Disconnect the WebSocket while REST backfill is in progress; buffer events and prove the REST↔stream seam closes.
 4. Terminate/restart the process during recovery; prove idempotent resume without missing or double-counted bars.
@@ -90,16 +94,16 @@ Execute the following controlled scenarios using a test harness, not a live trad
 6. Force rate-limit responses, partial historical responses and unavailable history ranges.
 7. Make one constituent incomplete while the other 49 are current; prove global readiness remains NOT LIVE.
 8. Complete all 50 × 2 timeframe datasets, warm all required indicators/structure state and verify a common completed-bar watermark before readiness can be marked eligible in the harness.
-9. Introduce a new gap or stale feed after simulated readiness; prove readiness is revoked before any new signal can be emitted.
+9. During a live NSE session, introduce a controlled new gap or stale-feed condition after simulated readiness; prove readiness is revoked before any new signal can be emitted. Record that the failure was injected in the live-session harness; historical replay alone is insufficient.
 
 For each scenario capture state transitions, expected/actual candle counts, per-symbol/timeframe watermarks, request budget, retry/backoff, elapsed time and reason codes. A harness result validates the tested recovery logic only; it does not authorize production LIVE.
 
-**Pass condition:** all negative scenarios fail closed; no incomplete/ambiguous case is marked ready; restart and replay are deterministic; no synthetic candle is created.
+**Pass condition:** all negative scenarios fail closed; no incomplete/ambiguous case is marked ready; restart and replay are deterministic; no synthetic candle is created. If a live session was not observed, E1/E9 are NOT PROVEN and cannot be counted as passing.
 
 ### F. §4A.4 confirmed halt / zero-trade classification
 Test separately, per instrument and per timeframe:
-- **Confirmed halt positive fixture:** only pass if an authoritative exchange/broker status source provides explicit halt/suspension status, source identity, timestamp and session scope, and the evidence is persisted.
-- **Confirmed zero-trade positive fixture:** only pass if historical response bracketing, documented SmartAPI empty-interval semantics, healthy continuous per-symbol WebSocket subscription and no observed trade event jointly establish the condition.
+- **Confirmed halt positive fixture:** only pass if an authoritative exchange/broker status source provides explicit halt/suspension status, source identity, timestamp and session scope, and the evidence is persisted. A naturally occurring halt may be opportunistic; if none occurs in the observation window, mark the real-event fixture NOT PROVEN. A simulated fixture can test classification logic but cannot establish that a real authoritative source is available/reliable.
+- **Confirmed zero-trade positive fixture:** only pass if historical response bracketing, documented SmartAPI empty-interval semantics, healthy continuous per-symbol WebSocket subscription and no observed trade event jointly establish the condition. For liquid Nifty 50 names a natural zero-trade 5m bucket may not occur in the sample; if none is observed, mark this positive fixture NOT PROVEN. This is not, by itself, a Gate 0 failure; `SYMBOL_NO_TRADE_BUCKET` remains unavailable/disabled and such intervals stay UNKNOWN → block.
 - **Negative fixtures:** API partial response; WebSocket disconnect; invalid/stale token; missing subscription acknowledgement; delayed historical publication; stale heartbeat; conflicting REST/stream data; ambiguous no-data.
 - **Aggregation:** verify that a 15m no-data classification is not inferred from one missing 5m bar; a 15m bar is complete only under the documented three-5m aggregation contract.
 - **Timeout:** fail closed to UNKNOWN / DEGRADED / NOT LIVE after the configured bounded confirmation timeout.
@@ -117,13 +121,25 @@ Test separately, per instrument and per timeframe:
 **Pass condition:** reproducible coverage is demonstrated for the stated sample and limitations. Otherwise options historical backtesting remains LIMITED/UNAVAILABLE and the v0.2 prospective Gate 5 fallback applies.
 
 ### H. F8 — volume history and RVOL feasibility
-- For all 50 constituents, measure usable 5m and 15m volume history by instrument and session.
-- Check at least 20 prior sessions where available; explicitly report the count of valid same-time-of-day observations and missing sessions.
+- Reuse the exact shared ≥20 completed-session 5m/15m dataset from Workstream C; do not issue a second deep historical pull for the same universe/period.
+- For all 50 constituents, measure usable volume history by instrument and session.
+- Check all 20 sessions where available; explicitly report the count of valid same-time-of-day observations and missing sessions.
 - Validate volume units/semantics, session resets, zero-volume/empty intervals and consistency between REST and stream aggregation.
 - Determine how many symbols meet the minimum 10 valid-session baseline and whether this is stable across the universe.
 - Do not encode unavailable volume as zero. RVOL remains disabled for any instrument/time bucket without the required valid baseline and approved missing-feature policy.
 
 **Pass condition:** data coverage and volume semantics are empirically characterized. Gate 0 does not approve scoring weights or enable RVOL automatically.
+
+### I. Clock integrity and readiness input (A5)
+- Compare the host clock continuously against a trusted time source and record offset, jitter, source availability and measurement timestamps.
+- Configure `max_clock_skew_seconds` before the test; its value must be justified and recorded, not silently inferred at runtime.
+- Inject positive and negative clock-offset cases around the configured boundary. Skew beyond the threshold, loss of trusted-time evidence, or an unmeasurable clock offset must force `DEGRADED / NOT LIVE` before readiness can be granted or retained.
+- Include clock-skew cases in the negative fixtures for Workstreams E and F. A correct WebSocket connection does not compensate for an untrusted host clock.
+
+### J. Harness isolation and credential handling (A6)
+- Run the audit harness in an isolated process/environment (for Python, `-I` may be used as one layer) with least-privilege filesystem/network access and no ability to execute repository-supplied untrusted data as code.
+- Read credentials only at runtime from an ignored local environment file or in-memory secret input; verify the file is gitignored and never print or serialize secrets.
+- Do not commit credential files, raw authenticated headers, tokens, account identifiers or sensitive provider payloads. Redact logs before persistence. Python isolated mode alone is not a substitute for OS/process isolation or secret redaction.
 
 ## 4. Required evidence package
 
@@ -143,10 +159,12 @@ Every table must include its sampling period and limitations. No screenshots alo
 
 ## 5. Gate 0 exit criteria
 
+**Cold-start operational go/no-go (A4):** Measure the complete 50×2 backfill for the deepest required warm-up dependency, including chunking, retries, throttling and validation, under the documented 3 req/s · 180/min limit. Add configurable `max_cold_start_minutes` with **10 minutes as a provisional test value**, not a proven provider guarantee. Record whether the full recovery completes within that window. If it does not, the cold-start readiness criterion is FAIL for the tested configuration and Gate 0 must recommend an architectural remedy (e.g. persistent verified warm store, pre-market warm-up, or another jointly reviewed design); do not silently pass by weakening the common-watermark rule or ranking a partial universe. The final operational threshold must be agreed by both co-owners after observing measured results.
+
 Gate 0 is **PASS** only when:
 - All critical API/authentication, universe mapping, canonical candle, WebSocket continuity and gap-recovery tests pass for the declared scope.
-- Every §4A negative fixture remains NOT LIVE; no ambiguous no-data is classified as confirmed halt/zero-trade.
-- Historical publication delay and cold-start request budget are measured with sufficient sample size and their operational implications are documented.
+- Every §4A negative fixture (including clock skew) remains NOT LIVE; no ambiguous no-data is classified as confirmed halt/zero-trade. A naturally occurring zero-trade bucket or halt need not occur during the sample: mark the corresponding real-event fixture NOT PROVEN, retain fail-closed behaviour, and do not enable that non-blocking exception. A NOT PROVEN optional no-data exception does not alone fail the core Gate 0 readiness audit.
+- At least one complete live session is observed; historical publication delay and cold-start request budget are measured with sufficient sample size and their operational implications are documented. If target 2–3 sessions or a high-volatility session were not available, state that limitation.
 - F7 and F8 outcomes are explicitly reported, including unavailable/partial outcomes and the resulting feature/backtest restrictions.
 - All evidence is reproducible from the recorded code/config and sanitized audit bundle.
 - Both co-owners independently review the evidence and record agreement on the Gate 0 disposition.
