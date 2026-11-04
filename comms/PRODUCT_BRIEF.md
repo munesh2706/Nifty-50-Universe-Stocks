@@ -7,7 +7,7 @@
 
 ## 1. Product goal
 
-Build a fully functional, single-page intraday website that selects tradable stocks from the current Nifty 50 universe. The website must make the complete selection process observable, not merely display a final recommendation.
+Build a fully functional, single-page intraday website that selects tradable **Nifty 50 cash-equity shares only**. Futures, options and all other derivatives are outside the product boundary. The website must make the complete selection process observable, not merely display a final recommendation.
 
 The website is a decision-support product. No live order placement is authorised by this brief.
 
@@ -38,8 +38,8 @@ Indicator presence must not be confused with a validated trading edge. Each indi
 ## 4. Product behaviour and integrity
 
 - Nifty 50 constituent membership is maintained as versioned reference data.
-- Underlying stock universe (50) is distinct from the dynamically eligible stock F&O contract universe.
-- Use Angel One SmartAPI as the initial market-data/broker integration, subject to a data-capability audit.
+- The product universe is the current Nifty 50 cash-equity constituents only. No F&O contract universe or derivative mapping is maintained.
+- Use Angel One SmartAPI as the initial cash-equity market-data integration, subject to a data-capability audit. Read-only market data only; no order placement.
 - Show actual feed state and timestamps. Distinguish streaming quote updates, forming candles and completed candles.
 - Confirmed signals must not use incomplete candles or future information.
 - Missing, stale, disconnected or inconsistent data must be visible and must suppress unsafe recommendations.
@@ -92,3 +92,12 @@ The first usable end-to-end version should demonstrate:
 8. Tests for ranking, pipeline state transitions, data freshness and signal no-look-ahead behaviour.
 
 This brief is the shared product direction. The strategy specification remains a research baseline until its provisional parameters are reviewed and validated.
+
+
+## 8. Binding instrument-scope clarification (2026-11-05)
+
+- **Cash equities only:** current Nifty 50 constituent shares in the NSE cash/equity segment.
+- **Explicitly excluded:** futures, options, F&O eligibility, expiries, lot sizes, strikes, Greeks, IV, derivative contract selection, derivative historical-data audits and derivative-specific risk models.
+- Bullish candidates represent potential cash-equity buys. Bearish candidates represent potential intraday cash-equity short-sale opportunities only where permitted and operationally available; do not imply ordinary overnight cash short positions. If short selling is unavailable, retain bearish ranking as research context but do not label it executable.
+- The application remains decision support only and places no orders.
+- All data readiness, scoring, backtesting, costs and dashboard requirements must be defined for cash-equity shares only.
