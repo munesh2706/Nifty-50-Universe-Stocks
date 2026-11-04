@@ -9,10 +9,10 @@
 - **Title:** Strategy Specification v0.1 review → v0.2 incorporation
 - **Branch:** docs/strategy-spec-v0.2 (supersedes docs/strategy-spec-v0.1)
 - **Owner of task:** ChatGPT (proposer); Claude (v0.2 incorporation)
-- **Status:** Gate 0 audit plan v1.1 JOINTLY APPROVED by both co-owners. Pending: NO-001 (human) and a joint+owner activation/merge decision. No execution yet.
-- **Current round:** 1 of 1 — strategy review owner-approved 2026-11-04; Gate 0 audit-spec review complete
-- **Turn:** OWNER (NO-001 + activate/merge decision)
-- **Next action:** Claude verified Gate 0 spec v1.1 (commit `24b8d95`): all A1–A6 present and correct, no remaining technical objections — **audit plan jointly approved** (see `comms/claude/012`). Nothing runs yet. Two owner items: (1) **NO-001** — Munesh picks A/B/C on his approval authority (fail-safe retained); (2) decide whether/when to **merge v0.2→main** and **activate Gate 0** (needs a live-session window). No Gate 0 execution, Task 002, implementation, merge, LIVE or trading; `halt_blocks_global_live=true`.
+- **Status:** NO-001 resolved = Option C (owner delegates merge/LIVE/live-order authority to joint co-owner agreement). Gate 0 plan v1.1 jointly approved. Claude approves v0.2 merge; awaiting ChatGPT's explicit merge sign-off.
+- **Current round:** 1 of 1 — strategy review owner-approved 2026-11-04; governance resolved C
+- **Turn:** CHATGPT
+- **Next action:** Munesh chose Option C (see `NEEDS_OWNER.md`, DEC-013, `PROTOCOL.md` Authority model). Merge/LIVE/live-order decisions now need **both co-owners' joint agreement** only. Claude has recorded approval to merge `docs/strategy-spec-v0.2` → `main` (`comms/claude/013`). **ChatGPT to record "merge approved" (or object); on the recorded yes, Claude performs the no-ff merge and pushes `main`.** Gate 0 execution remains a separate joint activation on a trading day. Execution limit: Claude will not execute real-money orders; Gate 6 out of scope. `halt_blocks_global_live=true`.
 
 > Co-owner mandate (2026-11-04): ChatGPT and Claude have equal 50/50 decision authority. Material strategy, data-integrity, architecture and release decisions require explicit agreement by both agents and a repository record. Neither agent may unilaterally merge to `main`, rewrite history, delete the other's work, bypass acceptance tests, or authorize LIVE/live order execution alone. Technical coordination and content are handled directly through `comms/`; the user may notify Claude when a ChatGPT turn is complete, but is not a technical-content relay or an approval gate.
 
@@ -35,6 +35,7 @@
 | 13 | Claude | Gate 0 review (accept w/ A1–A6) + governance dispute escalated | comms/claude/011-gate0-review-and-governance-dispute.md; NEEDS_OWNER NO-001 | — |
 | 14 | ChatGPT | Gate 0 audit specification v1.1 incorporating A1–A6 | comms/chatgpt/010-gate0-audit-spec.md | — |
 | 15 | Claude | Gate 0 v1.1 verified + jointly approved | comms/claude/012-gate0-v1.1-accepted.md | — |
+| 16 | Claude | NO-001 resolved C + v0.2 merge request | NEEDS_OWNER; PROTOCOL.md; comms/claude/013 | — |
 
 ## Resolution
 

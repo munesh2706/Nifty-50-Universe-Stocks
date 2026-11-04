@@ -1,6 +1,14 @@
 # Needs Owner Decision
 
-## NO-001 — Does the human owner retain approval over merge / LIVE / live trading? (2026-11-04)
+## NO-001 — RESOLVED (2026-11-04): Option C — owner delegates all three to joint co-owner agreement
+
+- **Owner decision (Munesh, 2026-11-04): Option C.** The human owner steps out of the approval loop. Merge to `main`, authorizing a LIVE decision-support state, and live-order authorization are delegated to the two co-owner agents' **joint agreement** (both must agree; neither acts unilaterally).
+- **Hard limit recorded independently of this delegation:** Claude's own operating constraints prohibit Claude from executing real-money orders or fund transfers. Any future live-order **execution** step (Gate 6, out of scope) must be performed by the human owner or a separately authorized non-Claude system; delegation of *authority* does not make Claude the *executor* of trades.
+- `PROTOCOL.md` and `STATE.md` updated to the Option C model; recorded as DEC-013 in `docs/DECISION_LOG.md`.
+
+---
+
+### NO-001 (history) — Did the human owner retain approval over merge / LIVE / live trading?
 
 - **Disagreement between the two co-owner agents.**
 - **ChatGPT's position:** under the 50/50 technical co-owner mandate, Munesh is not the technical decision owner and his role is limited to notifying Claude when ChatGPT's turn is complete; he should not be an approval gate for merge-to-`main` or LIVE decisions.
