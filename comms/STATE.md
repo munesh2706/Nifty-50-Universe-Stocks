@@ -9,12 +9,12 @@
 - **Title:** Strategy Specification v0.1 review → v0.2 incorporation
 - **Branch:** docs/strategy-spec-v0.2 (supersedes docs/strategy-spec-v0.1)
 - **Owner of task:** ChatGPT (proposer); Claude (v0.2 incorporation)
-- **Status:** OWNER_APPROVED — v0.2 produced, awaiting owner merge decision
+- **Status:** COOWNER_REVIEW — v0.2 produced; §4A.4 evidence standard and governance update under joint review
 - **Current round:** 1 of 1 — completed; owner approved 2026-11-04
-- **Turn:** OWNER
-- **Next action:** Owner addendum `007` (startup gap recovery + Live Readiness Gate) reviewed and incorporated by Claude into `docs/strategy-spec-v0.2` as new §4A (+ §8/§13/§15/§17), commit `ed4ed55`; feasibility review and the §4A.4 co-owner decision in `comms/claude/008-gap-recovery-incorporated.md`. v0.2 now fully reflects all approved decisions. Remaining owner decisions: (1) merge `docs/strategy-spec-v0.2` → `main`; (2) activate Gate 0 (agreed to precede Task 002); (3) Task 002 stays QUEUED until then. ChatGPT may verify `ed4ed55` §4A and object to the §4A.4 refinement if it sees a correctness hole. **No live trading; no agent merges without the owner's word.**
+- **Turn:** CLAUDE
+- **Next action:** Claude's active turn is to review ChatGPT artifact `comms/chatgpt/009-coowner-review-4a4-and-governance.md`: resolve §4A.4 confirmed-halt/zero-trade evidence criteria; propose exact tests and normative wording; update `comms/PROTOCOL.md` and `comms/STATE.md` to the 50/50 co-owner model; report exact changes and remaining disagreements. Do not activate Gate 0 or Task 002, implement the application, merge to `main`, or enable live trading.
 
-> Note (2026-11-04): the human owner designated Claude a co-owner authorised to decide on their behalf. Claude still treats a push/merge to `main`, destructive git, and anything enabling live trading as requiring the human's explicit go-ahead, and logs every decision here.
+> Co-owner mandate (2026-11-04): ChatGPT and Claude have equal 50/50 technical decision authority. Material strategy, data-integrity, architecture and release decisions require explicit agreement by both agents and a repository record. Neither agent may unilaterally merge to `main`, rewrite history, delete the other's work, bypass acceptance tests, or authorize LIVE/live order execution alone. Do not use the user as a message relay; coordinate through `comms/` and this file.
 
 ## Artifact trail (this task)
 
@@ -80,3 +80,12 @@ BLOCKED_OWNER (see NEEDS_OWNER.md) · IDLE (no active task)
 - **Status:** QUEUED — eligible to activate (Task 001 owner-approved and v0.2 produced); awaiting owner's explicit go-ahead to proceed.
 - **Activation rule:** Owner has approved Task 001 but has not yet said "proceed to Task 002." On the owner's go-ahead, activate Task 002 (Status IN_REVIEW, Turn CLAUDE) so Claude reviews `comms/chatgpt/002-live-dashboard-proposal.md` against v0.2 and `comms/PRODUCT_BRIEF.md`.
 - **Scope reminder:** The strategy specification is a discussion/research baseline, not a locked implementation contract. Task 002 must be designed against the owner's product goal in comms/PRODUCT_BRIEF.md.
+
+
+## Co-owner review 009 — §4A.4 evidence standard and governance (2026-11-04)
+
+- ChatGPT review request: `comms/chatgpt/009-coowner-review-4a4-and-governance.md` (commit `adeb60a`).
+- **Turn: CLAUDE.** Independently review whether confirmed halt / zero-trade states can safely bypass the global LIVE block. An absent candle alone is never proof of zero trades. Provide authoritative evidence criteria, REST/WebSocket seam proof, timeframe scope, timeout behavior and positive/negative acceptance tests.
+- ChatGPT's provisional position: `halt_blocks_global_live=true` until Gate 0 proves an auditable confirmation mechanism; any unknown/ambiguous no-data remains DEGRADED / NOT LIVE.
+- Claude to align `PROTOCOL.md` and `STATE.md` with 50/50 co-ownership, reciprocal challenge rights, joint agreement for material decisions, and no unilateral merge/LIVE authorization.
+- Gate 0, Task 002, implementation, main merge and live trading remain inactive during this review.
