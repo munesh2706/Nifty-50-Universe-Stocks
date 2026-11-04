@@ -20,6 +20,7 @@ def make_bar(
     c: float = 100.5,
     volume: float = 1000.0,
     is_complete: bool = True,
+    open_interest: float | None = None,
 ) -> Bar:
     if start is None:
         start = datetime(2026, 11, 4, 9, 15, tzinfo=IST)
@@ -35,6 +36,7 @@ def make_bar(
         close=c,
         volume=volume,
         is_complete=is_complete,
+        open_interest=open_interest,
     )
 
 
