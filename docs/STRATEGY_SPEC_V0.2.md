@@ -183,51 +183,61 @@ CHoCH is the first confirmed close through the **protected** opposing swing that
 
 Rules:
 - In **NEUTRAL**, the first qualifying bullish BOS establishes BULL; the first qualifying bearish BOS establishes BEAR. The establishing event is **BOS**, not CHoCH.
+- **NEUTRAL double break (determinism rule).** If one completed candle's close satisfies **both** the bullish-break and bearish-break predicates simultaneously — which can occur only in the degenerate case where the latest confirmed swing low lies **above** the latest confirmed swing high, creating a price overlap band — then emit **no BOS**, remain **NEUTRAL**, and record `STRUCTURE_AMBIGUOUS_DOUBLE_BREAK` with both level IDs. No directional priority is applied; the engine waits for unambiguous structure.
 - On a bullish establishing BOS, set `protected_low` to the most recent confirmed swing low whose confirmation time is before the BOS bar close. On a bearish establishing BOS, set `protected_high` symmetrically. If no such pivot exists, do **not** establish directional state from that break; emit no structure event and wait for sufficient confirmed structure.
 - In **BULL**, the protected level is the swing low selected at the most recent bullish BOS. It stays protected until a later bullish BOS updates it — **a newer swing low by itself does not replace it.** A completed close below `protected_low` (incl. buffer) emits **CHoCH**, changes state immediately to BEAR, and sets `protected_high` to the most recent confirmed swing high before the CHoCH close.
 - In **BEAR**, apply the exact mirror: `protected_high` is selected at the most recent bearish BOS and stays fixed until that BOS updates it. A completed close above it emits CHoCH, flips state to BULL, and sets `protected_low` to the most recent confirmed swing low before the CHoCH close.
 - After a CHoCH the new state is active immediately; a subsequent break in the new direction is classified as BOS and updates its protected swing. This avoids an undefined intermediate state.
-- A missing protected pivot after a CHoCH is a **structure insufficiency**: retain the newly established direction but mark its protected level unavailable; do not fabricate one, and do not issue another CHoCH until a valid protected level exists.
-- Persist pivot IDs and confirmation timestamps, not just prices.
+- **Protected level unavailable after a CHoCH (determinism rule).** A CHoCH breaks the existing protected level, then selects a *new* protected level in the opposite swing set. If no qualifying opposite pivot exists before the CHoCH close, the CHoCH itself still stands and the new direction is retained, but the new protected level is set to **UNAVAILABLE**, the state flag `protection_pending` is set `true`, and `STRUCTURE_PROTECTION_PENDING` is recorded. While `protection_pending` is true in a directional state: (a) **no further CHoCH may be emitted** (there is no level to break); (b) a continuation **BOS** in the trend direction is still evaluated and, when it occurs, attempts to populate the protected level from the latest confirmed opposite pivot before that close — if one now exists, `protection_pending` is cleared, otherwise it remains pending. The engine never fabricates a protected level. This behaviour is identical in the normative pseudocode below (the CHoCH check is guarded by `protected != null`), so text and pseudocode agree.
+- Persist pivot IDs, confirmation timestamps and the `protection_pending` flag, not just prices.
 
 Reference pseudocode (normative):
 
 ```
 state = NEUTRAL
-protected_low = null
+protected_low = null           # null == UNAVAILABLE (protection pending)
 protected_high = null
 
 for each completed 5m bar, chronologically:
     use only pivots confirmed before this bar closes
+    broke_high = close breaks latest confirmed swing high (incl. buffer)
+    broke_low  = close breaks latest confirmed swing low  (incl. buffer)
 
     if state == NEUTRAL:
-        if close breaks latest confirmed swing high:
+        if broke_high and broke_low:                 # degenerate overlap: swing_low above swing_high
+            emit STRUCTURE_AMBIGUOUS_DOUBLE_BREAK     # remain NEUTRAL, no BOS, no priority
+        else if broke_high:
             candidate = latest confirmed swing low before this close
             if candidate exists:
                 emit BOS_UP; state = BULL; protected_low = candidate
-        else if close breaks latest confirmed swing low:
+            # else: no anchor -> remain NEUTRAL, emit nothing
+        else if broke_low:
             candidate = latest confirmed swing high before this close
             if candidate exists:
                 emit BOS_DOWN; state = BEAR; protected_high = candidate
 
     else if state == BULL:
-        if close breaks protected_low:                      # evaluate protected break first
+        if protected_low != null and close breaks protected_low:   # protected break evaluated first
             emit CHOCH_DOWN(protected_low); state = BEAR
             protected_high = latest confirmed swing high before this close
-        else if close breaks latest confirmed swing high:
+            if protected_high == null: emit STRUCTURE_PROTECTION_PENDING   # protection_pending = true
+        else if broke_high:                                        # continuation
             emit BOS_UP
-            protected_low = latest confirmed swing low before this close
+            protected_low = latest confirmed swing low before this close   # may stay null -> pending; no CHoCH until set
 
     else if state == BEAR:
-        if close breaks protected_high:
+        if protected_high != null and close breaks protected_high:
             emit CHOCH_UP(protected_high); state = BULL
             protected_low = latest confirmed swing low before this close
-        else if close breaks latest confirmed swing low:
+            if protected_low == null: emit STRUCTURE_PROTECTION_PENDING
+        else if broke_low:
             emit BOS_DOWN
             protected_high = latest confirmed swing high before this close
 ```
 
-Edge case for fixtures: if a single wide-range bar closes beyond both the latest swing high and swing low while in NEUTRAL, the `if/else` above resolves the bullish break first; this tie-break is deliberate and must have a dedicated unit-test fixture.
+Determinism notes (Gate 2 fixtures):
+- The only way one completed candle can satisfy both break predicates is the degenerate overlap where the latest confirmed swing low sits above the latest confirmed swing high. It resolves to `STRUCTURE_AMBIGUOUS_DOUBLE_BREAK` (no BOS, remain NEUTRAL) — **not** a directional priority. A dedicated fixture must cover it.
+- A CHoCH whose new opposite pivot does not yet exist resolves to `protection_pending` with `STRUCTURE_PROTECTION_PENDING`: the flip stands, no further CHoCH fires, and the next continuation BOS repopulates the protected level. A dedicated fixture must cover this, including the subsequent BOS that clears the flag.
 
 ### 7.4 Displacement
 
@@ -471,7 +481,7 @@ Same input data + same code version + same config must reproduce the same result
 
 - **Gate 0 — Data audit:** Prove SmartAPI login, streaming, candle history, instrument master refresh, rate limiting, reconnect and persistence. No signals. **Must additionally (F7, F8):** (a) test actual historical OHLC retrieval for a documented sample of **expired** individual-stock option contracts across expiries, strikes and dates, including contracts no longer in the current instrument master — recording requested vs returned candles, coverage dates, missing intervals, symbol/token resolution method, API errors/rate limits and reproducibility; and (b) measure usable, gap-audited 5m/15m **volume** history per instrument (including recently added constituents and holiday/missing-bar sessions) to settle the RVOL baseline sample counts of §6.1. These Gate 0 findings resolve F7/F8; they are not Gate 2 blockers.
 - **Gate 1 — Scanner:** Build 50-stock table and 15m features; test data quality and ranking reproducibility. Include the §6.2 neutral band (F5). RVOL scoring stays disabled until the F8 data audit and an approved missing-feature policy exist.
-- **Gate 2 — Deterministic structure:** Implement pivots/BOS/CHoCH/OB/FVG as pure functions with hand-checked fixtures and no-look-ahead tests. **Fixtures must cover both directions and (F1–F4):** NEUTRAL establishment, protected-swing selection, CHoCH reversal and immediate re-arming, multi-candle displacement OB anchoring on D1, equal-extreme liquidity pools, the NEUTRAL double-break tie-break, and no-look-ahead pivot confirmation.
+- **Gate 2 — Deterministic structure:** Implement pivots/BOS/CHoCH/OB/FVG as pure functions with hand-checked fixtures and no-look-ahead tests. **Fixtures must cover both directions and (F1–F4):** NEUTRAL establishment, protected-swing selection, CHoCH reversal and immediate re-arming, multi-candle displacement OB anchoring on D1, equal-extreme liquidity pools, no-look-ahead pivot confirmation, and the two §7.3 determinism cases — `STRUCTURE_AMBIGUOUS_DOUBLE_BREAK` (degenerate overlap in NEUTRAL: no BOS, stay NEUTRAL) and `STRUCTURE_PROTECTION_PENDING` (CHoCH with no available new protected pivot, plus the later continuation BOS that clears the flag).
 - **Gate 3 — Tradability and derivative mapping:** Add 5m entry state machine, contract eligibility and risk/cost estimates.
 - **Gate 4 — Historical replay:** Shared engine, realistic execution, bias controls and out-of-sample reports.
 - **Gate 5 — Paper observation:** Live shadow signals without order placement; compare live events with replay expectations.
@@ -509,3 +519,16 @@ Incorporates the Task 001 review/revision dispositions (owner-approved 2026-11-0
 | F11 | Added explicit WARMUP regime state that suppresses labels and countertrend ranking until inputs are valid. | §5 |
 
 All values introduced here remain provisional research parameters and must be sensitivity-tested; none is an approved production threshold or a profitability claim.
+
+### Post-approval corrections (2026-11-04)
+
+Owner-directed corrections after v0.2 approval. Smallest-necessary changes; no unrelated parameters altered.
+
+| Item | Change | Section |
+|---|---|---|
+| §7.3-C1 | Replaced the NEUTRAL double-break "bullish priority" tie-break (which was in fact impossible under close-based breaks) with explicit `STRUCTURE_AMBIGUOUS_DOUBLE_BREAK`: on the degenerate overlap (latest swing low above latest swing high) emit no BOS and remain NEUTRAL. | §7.2 inapplicable; §7.3 rules, pseudocode, fixtures |
+| §7.3-C2 | Made the protected-level-unavailable-after-CHoCH behaviour explicit and consistent between prose and normative pseudocode: CHoCH stands, direction retained, protected level = UNAVAILABLE with `protection_pending`/`STRUCTURE_PROTECTION_PENDING`; no further CHoCH until a continuation BOS repopulates the level. Pseudocode CHoCH check guarded by `protected != null`. | §7.3 rules, pseudocode, fixtures |
+| §15 | Added Gate 2 fixtures for both new cases. | §15 |
+| Timeframe | Finalized 5m/15m as the sole configuration (no parallel 1/5 mode). Rationale and trade-offs recorded in `DECISION_LOG.md` DEC-005 and `comms/claude/003-timeframe-decision-review.md`. 1m retained only as a possible Gate 5 execution-timing experiment, never a parallel mode. | A-03, DEC-005 |
+
+New structure-engine event codes introduced: `STRUCTURE_AMBIGUOUS_DOUBLE_BREAK`, `STRUCTURE_PROTECTION_PENDING`. These are persisted structure events (§12), distinct from §8 NO_TRADE reason codes.

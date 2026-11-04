@@ -25,7 +25,7 @@ Read [COLLABORATION_RULES.md](COLLABORATION_RULES.md) before contributing. The p
 
 ## Documents
 - [Project vision](docs/PROJECT_VISION.md)
-- [Strategy specification v0.1](docs/STRATEGY_SPEC_V0.1.md)
+- [Strategy specification v0.2](docs/STRATEGY_SPEC_V0.2.md)
 - [Decision log](docs/DECISION_LOG.md)
 - [Collaboration rules](COLLABORATION_RULES.md)
 

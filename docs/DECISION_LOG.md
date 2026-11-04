@@ -54,11 +54,15 @@ Record material product, architecture, data and trading-strategy decisions here.
 - **Consequences:** Data adapter must respect documented API limits, WebSocket constraints, token lifecycle and historical interval request limits. Persist collected data locally; do not assume unlimited historical availability.
 
 ### DEC-005 — 15-minute scanner and 5-minute setup timeframe
-- **Status:** Accepted
+- **Status:** Accepted — finalized as the sole configuration (2026-11-04)
 - **Date:** 2026-11-04
 - **Owner:** Munesh
-- **Decision:** Use completed 15-minute candles for market regime and directional stock ranking; use completed 5-minute candles for market structure, order blocks, setup and entry analysis.
-- **Consequences:** No confirmed signal may depend on an incomplete candle. Tick/stream data can support live aggregation and display but must follow the canonical completed-bar contract.
+- **Decision:** Use completed 15-minute candles for market regime and directional stock ranking; use completed 5-minute candles for market structure, order blocks, setup and entry analysis. This is the **single** timeframe configuration; 1-minute/5-minute is rejected and **no parallel timeframe mode is retained.**
+- **Options considered:** 5m/15m (adopted) vs 1m/5m.
+- **Evidence / reasoning (both agents aligned):** See `comms/claude/003-timeframe-decision-review.md` for the full independent assessment. Summary: (1) the instrument is bought options/futures, so a setup must produce a move large enough to beat option spread + theta — 1m/5m setups rarely clear the §9.3 option-R:R gate, so 1/5 buys frequency the instrument cannot monetise; (2) 5m closes + break buffer + displacement filter cut false BOS/CHoCH that dominate 1m/5m structure; (3) 15m ranking across 50 names is far more stable than 5m re-ranking; (4) fewer, higher-conviction trades amortise STT/brokerage/spread/theta better; (5) 5m/15m is the feasible SmartAPI backtest substrate (1m history is shallower and ~5× heavier).
+- **Trade-offs accepted:** 1/5's only genuine advantage is entry precision / lower entry delay. On a fast 5m bar an entry can be extended, widening the stop. This is bounded in the spec by the OB-revisit entry trigger (§7.9) and the `max_entry_distance_atr` gate (F10), which converts over-extended setups into NO_TRADE rather than poor fills — the desired behaviour for a quality-over-frequency decision-support tool.
+- **Consequences:** No confirmed signal may depend on an incomplete candle. Tick/stream data can support live aggregation and display but must follow the canonical completed-bar contract. A 1-minute **execution-timing trigger inside an already-confirmed 5m setup** is the only sanctioned future timeframe experiment, to be tested with evidence at Gate 5; it is not a parallel mode and does not reopen this decision. Gate 4 must quantify the 5m entry-delay penalty (entry slippage vs OB boundary, MAE, max_entry_distance_atr rejection rate).
+- **Revisit only if:** Gate 4/Gate 5 evidence shows the 5m entry granularity materially degrades net-of-cost expectancy, in which case evaluate a 1m execution trigger first — not a switch to 1/5.
 
 ### DEC-006 — F&O derivative scope
 - **Status:** Accepted at product-scope level
@@ -111,4 +115,4 @@ Record material product, architecture, data and trading-strategy decisions here.
 
 ## Research baseline (not empirically validated)
 
-See [STRATEGY_SPEC_V0.1.md](STRATEGY_SPEC_V0.1.md) for provisional directional scoring weights, SMC definitions, tradability score, derivative filters, data contracts and backtest methodology. These are test hypotheses, not approved profitability claims. Changes require evidence, versioning and regression tests.
+See [STRATEGY_SPEC_V0.2.md](STRATEGY_SPEC_V0.2.md) for provisional directional scoring weights, SMC definitions, tradability score, derivative filters, data contracts and backtest methodology. These are test hypotheses, not approved profitability claims. Changes require evidence, versioning and regression tests.

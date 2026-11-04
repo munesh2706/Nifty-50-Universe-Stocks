@@ -9,7 +9,7 @@ This is a research and decision-support tool. It does not imply guaranteed retur
 - Underlying universe: all current Nifty 50 constituents (50 stocks).
 - Initial market-data provider: Angel One SmartAPI.
 - Scanner / directional ranking timeframe: completed 15-minute candles.
-- Setup / entry-analysis timeframe: completed 5-minute candles.
+- Setup / entry-analysis timeframe: completed 5-minute candles. This 5m/15m pairing is the **sole** timeframe configuration; 1m/5m is rejected and no parallel mode is retained (see DEC-005).
 - Derivative scope: NSE individual-stock futures and options, only where active contracts are available and permitted.
 - Trading horizon: intraday, inherited from the agreed project direction; session cutoffs and square-off time remain to be approved.
 - Direction: bullish and bearish.
@@ -44,7 +44,7 @@ The scanner universe is the 50 Nifty 50 cash-market constituents. The stock F&O 
 
 ## Strategy and implementation specification
 See:
-- [Strategy Specification v0.1](STRATEGY_SPEC_V0.1.md)
+- [Strategy Specification v0.2](STRATEGY_SPEC_V0.2.md)
 - [Decision Log](DECISION_LOG.md)
 - [Collaboration Rules](../COLLABORATION_RULES.md)
 
