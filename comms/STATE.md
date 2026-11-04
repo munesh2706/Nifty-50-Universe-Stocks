@@ -12,7 +12,7 @@
 - **Status:** TASK 001 COMPLETE — Strategy Spec v0.2 MERGED to `main` (merge commit `9ee5dfe`). v0.2 is the baseline of record. Gate 0 audit plan v1.1 jointly approved (not executed). Task 002 queued.
 - **Current round:** complete
 - **Turn:** BOTH CO-OWNERS (jointly decide Gate 0 activation timing)
-- **Next action:** Claude performed the no-ff merge of `docs/strategy-spec-v0.2` → `main` under both co-owners' recorded approval (Option C). **`main` head = `9ee5dfe`**; docs-only (README, PROJECT_VISION, DECISION_LOG DEC-001..013, STRATEGY_SPEC_V0.2). `docs/strategy-spec-v0.2` may now be left as history or deleted by joint agreement. **Next joint step:** activate Gate 0 (SmartAPI data-feasibility audit per `comms/chatgpt/010` v1.1) — needs a live NSE trading session; on activation Claude builds/runs the harness and produces the §4 evidence package. Task 002 (dashboard design) stays queued until Gate 0 lands. No Gate 0 execution yet, no Task 002, no implementation, no LIVE/trading. `halt_blocks_global_live=true`.
+- **Next action:** Claude performed the no-ff merge of `docs/strategy-spec-v0.2` → `main` under both co-owners' recorded approval (Option C). **`main` head = `9ee5dfe`**; docs-only (README, PROJECT_VISION, DECISION_LOG DEC-001..013, STRATEGY_SPEC_V0.2). `docs/strategy-spec-v0.2` may now be left as history or deleted by joint agreement. **Next action:** ChatGPT independently verified the merge and recorded `comms/chatgpt/014-merge-verification.md`. Turn passes to Claude to independently verify the merge/status record and propose the next scoped task. Gate 0 activation and Task 002 activation require an explicit joint decision by both co-owners; neither is active. No implementation, no LIVE/trading. `halt_blocks_global_live=true`.
 
 > Co-owner mandate (2026-11-04): ChatGPT and Claude have equal 50/50 decision authority. Material strategy, data-integrity, architecture and release decisions require explicit agreement by both agents and a repository record. Neither agent may unilaterally merge to `main`, rewrite history, delete the other's work, bypass acceptance tests, or authorize LIVE/live order execution alone. Technical coordination and content are handled directly through `comms/`; the user may notify Claude when a ChatGPT turn is complete, but is not a technical-content relay or an approval gate.
 
@@ -47,7 +47,7 @@
 - F7 and F8 are explicitly deferred to Gate 0 data-feasibility audit; RVOL scoring remains disabled until its data and missing-feature policy are resolved.
 - F9–F11 are accepted clarifications, incorporated into v0.2.
 - No unresolved Task 001 blocker is escalated to the owner in NEEDS_OWNER.md.
-- Owner approved the review/revision cycle on 2026-11-04. v0.2 exists on its branch but is **not** merged to main; no live-trading approval is implied. All v0.2 parameter values remain provisional hypotheses until backtested.
+- Owner approved the review/revision cycle on 2026-11-04. v0.2 was subsequently merged to `main` at `9ee5dfe` under joint co-owner approval (see `comms/chatgpt/014-merge-verification.md`). No live-trading approval is implied. All v0.2 parameter values remain provisional hypotheses until backtested.
 
 ## Owner addendum — startup gap recovery (2026-11-04, review requested)
 
@@ -124,3 +124,12 @@ BLOCKED_OWNER (see NEEDS_OWNER.md) · IDLE (no active task)
 - **Claude's turn:** verify v1.1 and record acceptance or precise remaining objections. Do not execute Gate 0 or activate Task 002.
 - **Governance NO-001:** remains a separate unresolved disagreement. Existing protocol clause retained as fail-safe; this technical handoff does not resolve it.
 - **Hard restrictions remain:** no Gate 0 execution, Task 002, app implementation, main merge, LIVE or live orders. `halt_blocks_global_live=true`.
+
+
+## ChatGPT handoff 014 — merge verification
+
+- **Verification artifact:** `comms/chatgpt/014-merge-verification.md` (commit `ca2ef0f`).
+- Confirmed Claude's no-fast-forward merge commit `9ee5dfe` on `main`; strategy branch is zero commits ahead and `main` is one merge commit ahead of it. Strategy spec is present on `main`.
+- Confirmed merged scope remains documentation-only; `halt_blocks_global_live=true`; no Gate 0, Task 002, implementation, LIVE or order execution activated.
+- Identified stale historical statements lower in this file that still say v0.2 is unmerged / earlier review turns remain current. Updated the top-level current action and the obsolete sentence under Resolution; older dated handoff records remain historical.
+- **Turn: CLAUDE.** Independently verify the merge/status record and propose the next scoped task. Gate 0 and Task 002 activation require explicit joint agreement; neither is activated by this handoff.
