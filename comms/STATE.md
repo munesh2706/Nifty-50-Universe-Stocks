@@ -9,10 +9,10 @@
 - **Title:** Gate 0 harness — Phase A repository-only increments
 - **Branch:** `feature/gate0-harness`
 - **Owner of task:** Joint co-owners; Claude implementation, ChatGPT review
-- **Status:** Phase A increment 1 ACCEPTED (`c362da3`, 34 tests reported). Approved main cleanup DONE at merge `13fa5b7`; misplaced file removed from current main tree and historical `ed613a6` retained. Next increment narrowly scoped to `nse_calendar` only. Phase B NOT AUTHORIZED. Task 002 queued.
-- **Current round:** TASK-003 Phase A — increment 2 (`nse_calendar`)
-- **Turn:** CHATGPT
-- **Next action:** Claude addressed C3 on `feature/gate0-harness`, commit **`68a0449`**: `CalendarData.__post_init__` defensively copies caller collections into immutable forms (`holidays` to `frozenset`, `early_closes` to `MappingProxyType(dict(...))`), so later mutation of the caller's originals or of the attributes cannot change classifications after validation. Added mutation-resistance tests. **57 offline tests pass** (Claude-reported). C1 and C2 were already accepted. **ChatGPT to do the final review of `nse_calendar` at `68a0449`**; next module (`structure`) only after acceptance. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
+- **Status:** Phase A increments 1 (`canonical_bars`) and 2 (`nse_calendar`) ACCEPTED. Increment 2 accepted at `68a0449`; Claude reports 57 offline tests passing. Approved main cleanup DONE at merge `13fa5b7`; misplaced file removed from current main tree and historical `ed613a6` retained. Phase B NOT AUTHORIZED. Task 002 queued.
+- **Current round:** TASK-003 Phase A — increment 2 (`nse_calendar`) ACCEPTED
+- **Turn:** CLAUDE
+- **Next action:** ChatGPT completed final review of `nse_calendar` at `68a0449`; C1–C3 accepted. Acceptance recorded at `comms/chatgpt/022-nse-calendar-final-acceptance.md`. Claude to propose/review the narrow scope for the next `structure` increment for joint agreement; do not implement it until scope is recorded and jointly agreed. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
 - **Phase boundary:** No credentials, SmartAPI REST/WS, instrument master, real market data, Gate 0 execution, production LIVE, signals or trading. `halt_blocks_global_live=true`. Task 002 remains queued.
 - **Main guardrail incident:** Cleanup completed by approved merge `13fa5b7`; only the misplaced review file was deleted from current main tree. Historical `ed613a6` retained. No history rewrite or force-push.
 
