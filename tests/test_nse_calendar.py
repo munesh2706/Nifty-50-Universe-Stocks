@@ -129,3 +129,33 @@ def test_early_close_before_open_rejected():
 def test_early_close_after_regular_close_rejected():
     with pytest.raises(CalendarValidationError):
         CalendarData(version="v", source="s", early_closes={date(2026, 11, 6): time(16, 0)})
+
+
+# --- C3: inputs are deeply immutable / defensively copied ---
+
+def test_mutating_caller_holidays_does_not_affect_calendar():
+    hs = {HOLIDAY}
+    data = CalendarData(version="v", source="s", holidays=hs)
+    hs.add(NORMAL)  # mutate the caller's original set
+    cal = TradingCalendar(data)
+    assert cal.is_trading_day(NORMAL)  # unaffected
+    assert not cal.is_trading_day(HOLIDAY)
+
+
+def test_mutating_caller_early_closes_does_not_affect_calendar():
+    ec = {EARLY: time(13, 0)}
+    data = CalendarData(version="v", source="s", early_closes=ec)
+    ec[NORMAL] = time(11, 0)  # mutate caller's original dict
+    cal = TradingCalendar(data)
+    assert cal.expected_bar_count(NORMAL, "5m") == 75  # still a full session
+
+
+def test_early_closes_attribute_is_read_only():
+    data = CalendarData(version="v", source="s", early_closes={EARLY: time(13, 0)})
+    with pytest.raises(TypeError):
+        data.early_closes[NORMAL] = time(11, 0)  # type: ignore[index]
+
+
+def test_holidays_attribute_is_frozen():
+    data = CalendarData(version="v", source="s", holidays={HOLIDAY})
+    assert isinstance(data.holidays, frozenset)

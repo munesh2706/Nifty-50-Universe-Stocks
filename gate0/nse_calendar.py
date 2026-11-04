@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
+from types import MappingProxyType
+from typing import Mapping
 
 from gate0.canonical_bars import IST, TIMEFRAME_MINUTES
 
@@ -36,11 +38,17 @@ class CalendarData:
     version: str
     source: str
     holidays: frozenset[date] = field(default_factory=frozenset)
-    early_closes: dict[date, time] = field(default_factory=dict)  # date -> early close time
+    early_closes: Mapping[date, time] = field(default_factory=dict)  # date -> early close time
     open_time: time = REGULAR_OPEN
     close_time: time = REGULAR_CLOSE
 
     def __post_init__(self) -> None:
+        # C3: defensively copy caller-supplied collections into immutable forms so
+        # that later mutation of the caller's originals (or of our attributes)
+        # cannot change classifications after validation.
+        object.__setattr__(self, "holidays", frozenset(self.holidays))
+        object.__setattr__(self, "early_closes", MappingProxyType(dict(self.early_closes)))
+
         if not (self.version and self.version.strip()):
             raise CalendarValidationError("version must be a non-empty provenance string")
         if not (self.source and self.source.strip()):
