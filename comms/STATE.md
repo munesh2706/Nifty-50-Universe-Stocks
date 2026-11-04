@@ -11,8 +11,10 @@
 - **Owner of task:** ChatGPT (proposer); Claude (v0.2 incorporation)
 - **Status:** OWNER_APPROVED — v0.2 produced, awaiting owner merge decision
 - **Current round:** 1 of 1 — completed; owner approved 2026-11-04
-- **Turn:** CLAUDE
-- **Next action:** Review owner addendum `comms/chatgpt/007-startup-gap-recovery-requirement.md`. Validate the startup/reconnect gap-recovery and hard Live Readiness Gate requirements; incorporate the minimum necessary normative rules into the v0.2 feature branch (or recommend a versioned addendum), add Gate 0 acceptance tests, and report commit SHA plus any SmartAPI feasibility limits. This is a specification-review/update turn only: **do not execute Gate 0, activate Task 002, implement the dashboard, merge to main, or enable live trading.** v0.2 remains awaiting owner merge decision.
+- **Turn:** OWNER
+- **Next action:** Owner addendum `007` (startup gap recovery + Live Readiness Gate) reviewed and incorporated by Claude into `docs/strategy-spec-v0.2` as new §4A (+ §8/§13/§15/§17), commit `ed4ed55`; feasibility review and the §4A.4 co-owner decision in `comms/claude/008-gap-recovery-incorporated.md`. v0.2 now fully reflects all approved decisions. Remaining owner decisions: (1) merge `docs/strategy-spec-v0.2` → `main`; (2) activate Gate 0 (agreed to precede Task 002); (3) Task 002 stays QUEUED until then. ChatGPT may verify `ed4ed55` §4A and object to the §4A.4 refinement if it sees a correctness hole. **No live trading; no agent merges without the owner's word.**
+
+> Note (2026-11-04): the human owner designated Claude a co-owner authorised to decide on their behalf. Claude still treats a push/merge to `main`, destructive git, and anything enabling live trading as requiring the human's explicit go-ahead, and logs every decision here.
 
 ## Artifact trail (this task)
 
@@ -24,6 +26,9 @@
 | 4 | Claude | incorporation (owner-approved) | docs/STRATEGY_SPEC_V0.2.md @ docs/strategy-spec-v0.2 | — |
 | 5 | Claude | timeframe review | comms/claude/003-timeframe-decision-review.md | — |
 | 6 | Claude | timeframe finalization + §7.3 corrections | docs/* @ docs/strategy-spec-v0.2 (commit 572ee55) | — |
+| 7 | Claude | §7.3 C2b precision (protection_pending boolean) | docs/STRATEGY_SPEC_V0.2.md (commit a321a9b) | — |
+| 8 | ChatGPT | owner addendum: startup gap recovery / Live Readiness Gate | comms/chatgpt/007-startup-gap-recovery-requirement.md | — |
+| 9 | Claude | gap-recovery incorporation + feasibility review | §4A @ docs/strategy-spec-v0.2 (commit ed4ed55); comms/claude/008 | — |
 | 7 | ChatGPT | owner addendum: startup gap recovery / no-live-before-sync | comms/chatgpt/007-startup-gap-recovery-requirement.md | owner directive |
 
 ## Resolution
