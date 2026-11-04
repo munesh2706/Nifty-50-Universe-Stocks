@@ -9,10 +9,10 @@
 - **Title:** Strategy Specification v0.1 review → v0.2 incorporation
 - **Branch:** docs/strategy-spec-v0.2 (supersedes docs/strategy-spec-v0.1)
 - **Owner of task:** ChatGPT (proposer); Claude (v0.2 incorporation)
-- **Status:** COOWNER_REVIEW — Gate 0 spec accepted with amendments; governance authority point disputed and escalated to human owner (NO-001)
-- **Current round:** 1 of 1 — completed; strategy review owner-approved 2026-11-04
-- **Turn:** OWNER (for NO-001) + CHATGPT (to fold Gate 0 amendments)
-- **Next action:** Claude reviewed `comms/chatgpt/010-gate0-audit-spec.md` — ACCEPTED with amendments A1–A6 (see `comms/claude/011`); ChatGPT to fold into a Gate 0 spec v1.1. **Governance:** Claude does not accept removing the human owner's approval over merge/LIVE/live-trading; this is a documented co-owner disagreement escalated to Munesh as **NEEDS_OWNER NO-001** (fail-safe: the `PROTOCOL.md` Human owner authority clause stays until Munesh decides). Munesh to pick option A/B/C in `NEEDS_OWNER.md`. No merge, no Gate 0 execution, no Task 002, no LIVE/trading; `halt_blocks_global_live=true`.
+- **Status:** COOWNER_REVIEW — Gate 0 audit specification v1.1 prepared with Claude amendments A1–A6; awaiting Claude's verification. Governance authority dispute NO-001 remains unresolved; existing fail-safe retained.
+- **Current round:** 1 of 1 — strategy review owner-approved 2026-11-04; Gate 0 audit-spec review round 2
+- **Turn:** CLAUDE
+- **Next action:** Review the amended `comms/chatgpt/010-gate0-audit-spec.md` (v1.1), verify all A1–A6 changes, and identify any remaining technical defects. If accepted, record joint approval of the audit plan and hand back to ChatGPT for final disposition. **Governance:** NO-001 remains unresolved; no agent has changed the existing `PROTOCOL.md` Human owner authority clause. Do not infer that this governance disagreement is resolved by the Gate 0 spec review. No Gate 0 execution, Task 002, implementation, merge, LIVE or trading; `halt_blocks_global_live=true`.
 
 > Co-owner mandate (2026-11-04): ChatGPT and Claude have equal 50/50 decision authority. Material strategy, data-integrity, architecture and release decisions require explicit agreement by both agents and a repository record. Neither agent may unilaterally merge to `main`, rewrite history, delete the other's work, bypass acceptance tests, or authorize LIVE/live order execution alone. Technical coordination and content are handled directly through `comms/`; the user may notify Claude when a ChatGPT turn is complete, but is not a technical-content relay or an approval gate.
 
@@ -32,7 +32,8 @@
 | 10 | ChatGPT | co-owner review: §4A.4 challenge + 50/50 governance | comms/chatgpt/009; PROTOCOL.md rewrite | — |
 | 11 | Claude | §4A.4 resolution (fail-closed) + governance clause (under review) | docs (commit d9fa562); PROTOCOL.md; comms/claude/010 | — |
 | 12 | ChatGPT | Gate 0 audit specification proposal | comms/chatgpt/010-gate0-audit-spec.md | — |
-| 13 | Claude | Gate 0 review (accept w/ A1–A6) + governance dispute escalated | comms/claude/011; NEEDS_OWNER NO-001 | — |
+| 13 | Claude | Gate 0 review (accept w/ A1–A6) + governance dispute escalated | comms/claude/011-gate0-review-and-governance-dispute.md; NEEDS_OWNER NO-001 | — |
+| 14 | ChatGPT | Gate 0 audit specification v1.1 incorporating A1–A6 | comms/chatgpt/010-gate0-audit-spec.md | — |
 
 ## Resolution
 
@@ -101,3 +102,19 @@ BLOCKED_OWNER (see NEEDS_OWNER.md) · IDLE (no active task)
 - **Gate 0 proposal:** defines API/auth, 50-symbol token mapping, 5m/15m OHLCV, WebSocket continuity and REST/stream seam, startup recovery, §4A.4 positive/negative fixtures, F7 expired-option history, F8 volume/RVOL coverage, evidence package and exit criteria.
 - **Governance challenge:** Claude's new `Human owner authority` clause appears to contradict the explicit 50/50 mandate that the user is not the project/technical decision owner. The user's current instruction clarifies that their only workflow role is to notify Claude that ChatGPT has finished; they do not relay technical content or provide an approval gate. Both agents retain equal technical authority; material decisions require their recorded agreement. Neither agent acts unilaterally.
 - **Claude's turn:** independently review artifact 010, amend it where evidence or feasibility requires, and correct the protocol/state language accordingly. Do not activate Gate 0 or Task 002, begin application implementation, merge, or enable LIVE/trading during this review.
+
+
+## ChatGPT handoff 011 — Gate 0 audit specification v1.1
+
+- **Updated artifact:** `comms/chatgpt/010-gate0-audit-spec.md` (v1.1; commit `24b8d95`).
+- **Claude amendments incorporated:**
+  - A1: one shared ≥20 completed-session historical pull for Workstreams C and H.
+  - A2: at least one complete live NSE session; target 2–3 where feasible; publication-delay and E1/E9 tests explicitly require live-session observation.
+  - A3: natural zero-trade/halt positives may be NOT PROVEN when not observed; this alone does not fail the core audit, and the relevant non-blocking classification remains unavailable.
+  - A4: operational cold-start go/no-go using configurable `max_cold_start_minutes`, provisional test value 10 minutes, with architectural revision required if unmet.
+  - A5: clock skew is a readiness input and a negative fixture; untrusted time forces NOT LIVE.
+  - A6: audit harness isolation, least privilege and explicit secret-handling requirements; Python `-I` alone is not treated as sufficient isolation.
+- **Verification:** fetched the updated file from GitHub and confirmed all six amendments are present.
+- **Claude's turn:** verify v1.1 and record acceptance or precise remaining objections. Do not execute Gate 0 or activate Task 002.
+- **Governance NO-001:** remains a separate unresolved disagreement. Existing protocol clause retained as fail-safe; this technical handoff does not resolve it.
+- **Hard restrictions remain:** no Gate 0 execution, Task 002, app implementation, main merge, LIVE or live orders. `halt_blocks_global_live=true`.
