@@ -99,6 +99,47 @@ Create one shared NSE calendar service used by ingestion, bar aggregation, signa
 
 Intraday trading is the intended horizon, but exact entry start, no-trade windows, last-entry time, forced square-off time and signal expiry duration remain **owner decisions**. Until approved, keep them configurable and disable live actionable alerts outside an explicitly configured session window.
 
+## 4A. Startup gap recovery and Live Readiness Gate
+
+Owner-directed requirement (2026-11-04). **Data synchronization is a prerequisite to LIVE, not a best-effort background task. If in doubt, fail closed: remain NOT LIVE.** A green WebSocket connection alone is not proof of synchronization.
+
+### 4A.1 Readiness states
+
+The system holds one explicit, observable readiness state, applied on cold start and after every reconnect/recovery event:
+
+`COLD_START → BACKFILLING → RECONCILING → WARMING_UP → LIVE`, with `DEGRADED` / `FAILED` exits. A reconnect, stale-feed breach, sequence gap or data-integrity failure must **leave LIVE first**, then run the full sequence before LIVE can be re-entered. Persist the readiness state and every transition time for replay parity (ties into the §5 WARMUP regime, which cannot clear while the system is not LIVE).
+
+### 4A.2 Recovery sequence (idempotent, restart-safe)
+
+1. Enter a non-live state immediately; emit no actionable signal and promote no candidate while not LIVE.
+2. Load the last persisted, **verified completed-candle watermark per constituent and per timeframe (5m and 15m)**, plus last feed/session metadata.
+3. Use the shared NSE calendar (§4) to compute expected candles. Nights, weekends, holidays and scheduled non-trading intervals are **not** missing data.
+4. Backfill missing candles from SmartAPI in bounded chunks that respect the documented rate limit (3 req/s, 180/min — §3.1), with an **overlap window** before the last stored candle to reconcile continuity and detect revised candles.
+5. Keep the WebSocket connected during REST backfill and buffer events with exchange timestamps; after backfill, reconcile the overlap, deduplicate by `instrument + timeframe + bar_start_ts`, and replay buffered events in timestamp order. Close the REST↔stream seam so no hole remains.
+6. Validate expected timestamps, OHLCV integrity, ordering, duplicates, gaps, stale/future timestamps and token mapping. Persist only validated canonical candles. **Never interpolate or forward-fill a candle to conceal a gap** (reinforces §3.3).
+7. Recompute indicators and structure state from sufficient verified history; warm-up length is the **longest** lookback/state dependency, not a short recent download.
+8. Establish a common completed-bar watermark across the required universe for both 5m and 15m. Only then may the gate transition to LIVE.
+
+### 4A.3 Hard no-live / no-signal rule
+
+- No directional ranking, top-three promotion, final selection or tradable alert while not LIVE.
+- The UI may show prices, connection diagnostics and recovery progress, but must visibly label the system `CATCHING UP` / `DEGRADED — NOT LIVE`; never present partial results as current recommendations.
+- If recovery cannot fill or verify a gap (API limit, unavailable history, unresolved token mapping, conflicting data, persistent missing candle), remain DEGRADED / NOT LIVE and expose the failure with reason codes.
+- A forming candle is never a completed candle; the engine still uses completed 15m scanner bars and completed 5m setup bars only.
+
+### 4A.4 Universe watermark vs confirmed no-data (co-owner decision, 2026-11-04)
+
+The owner requirement states that a missing/unverified required candle for **any** constituent blocks the **global** LIVE state, and that stocks must never be silently omitted. That is retained as the fail-closed default. One refinement is adopted here as a **co-owner decision by Claude**, flagged for the human owner to override:
+
+- Distinguish an **unverified gap** (unknown/unreconciled candle — this **blocks** global LIVE) from a **confirmed no-data condition** (an exchange-confirmed trading halt, or a bucket with genuinely zero trades for an illiquid name). A confirmed no-data condition is a *known* state, not a gap.
+- A constituent in a confirmed no-data condition is marked **non-eligible with a visible reason code** (e.g. `SYMBOL_HALTED`, `SYMBOL_NO_TRADE_BUCKET`) and is excluded from ranking — shown explicitly, never silently dropped. It does **not** by itself hold the whole 50-stock universe in NOT LIVE indefinitely.
+- Global LIVE therefore requires every constituent to be in a **known, verified state** — either a validated completed candle or an explicit confirmed-no-data reason — with **zero unverified gaps**. Any symbol in an unknown/unreconciled state still blocks global LIVE.
+- **Rationale and trade-off:** the strict literal reading ("any missing candle blocks global LIVE") would let a single halted or illiquid constituent brick the entire scanner for the session, which is itself a failure mode. This refinement keeps the fail-closed intent (nothing unverified passes) while preventing one known-halted name from disabling the other 49. If the human owner prefers the absolute literal rule, revert this subsection; the recovery engine supports both via a config flag `halt_blocks_global_live` (default: false under this decision).
+
+### 4A.5 Readiness audit trail
+
+Expose and persist: recovery run ID; stage and start/end times; per-symbol, per-timeframe last verified candle vs expected latest completed candle; missing-candle count/ranges and backfill request/response coverage; overlap reconciliation result and any OHLCV conflicts; WebSocket status, last event timestamp, staleness; warm-up completion and common universe watermark; and the explicit readiness decision with reason codes — plus request parameters, returned coverage, validation results, data source, timestamps and code/config version. Recovery must be idempotent and restart-safe.
+
 ## 5. Market regime engine (15m)
 
 Calculate on Nifty 50 index candles:
@@ -331,7 +372,7 @@ Initial hard gates:
 - Valid entry, stop and target.
 - At least one eligible derivative contract passes contract-level liquidity and risk checks.
 
-Select the highest score across bullish and bearish candidates. If none passes every gate, return NO_TRADE with reason codes such as NO_DIRECTIONAL_EDGE, NO_FRESH_SETUP, OB_INVALIDATED, ENTRY_TOO_EXTENDED, RR_BELOW_MINIMUM, CONTRACT_UNAVAILABLE, CONTRACT_ILLIQUID, DATA_STALE, MARKET_RESTRICTION, SESSION_CLOSED.
+Select the highest score across bullish and bearish candidates. If none passes every gate, return NO_TRADE with reason codes such as NO_DIRECTIONAL_EDGE, NO_FRESH_SETUP, OB_INVALIDATED, ENTRY_TOO_EXTENDED, RR_BELOW_MINIMUM, CONTRACT_UNAVAILABLE, CONTRACT_ILLIQUID, DATA_STALE, MARKET_RESTRICTION, SESSION_CLOSED. While the system is not LIVE (§4A), suppression is reported with SYSTEM_NOT_LIVE / SYNC_INCOMPLETE, and a constituent in a confirmed no-data condition carries SYMBOL_HALTED / SYMBOL_NO_TRADE_BUCKET.
 
 ## 9. Derivative contract selection
 
@@ -463,6 +504,7 @@ Same input data + same code version + same config must reproduce the same result
 - Top 3 bullish and top 3 bearish panels.
 - Highest tradability panel or NO TRADE with explanation.
 - Last update time and connection/data health indicator.
+- **Live Readiness banner (§4A):** prominent system state — `LIVE` vs `CATCHING UP` / `DEGRADED — NOT LIVE` — with current recovery stage, the common universe watermark, and the count of constituents blocking LIVE. Actionable panels (shortlists, best pick) are hidden or disabled while not LIVE.
 
 ### Instrument detail window
 - 15m and 5m chart views.
@@ -492,7 +534,7 @@ Same input data + same code version + same config must reproduce the same result
 
 ## 15. Implementation gates
 
-- **Gate 0 — Data audit:** Prove SmartAPI login, streaming, candle history, instrument master refresh, rate limiting, reconnect and persistence. No signals. **Must additionally (F7, F8):** (a) test actual historical OHLC retrieval for a documented sample of **expired** individual-stock option contracts across expiries, strikes and dates, including contracts no longer in the current instrument master — recording requested vs returned candles, coverage dates, missing intervals, symbol/token resolution method, API errors/rate limits and reproducibility; and (b) measure usable, gap-audited 5m/15m **volume** history per instrument (including recently added constituents and holiday/missing-bar sessions) to settle the RVOL baseline sample counts of §6.1. These Gate 0 findings resolve F7/F8; they are not Gate 2 blockers.
+- **Gate 0 — Data audit:** Prove SmartAPI login, streaming, candle history, instrument master refresh, rate limiting, reconnect and persistence. No signals. **Must additionally (F7, F8):** (a) test actual historical OHLC retrieval for a documented sample of **expired** individual-stock option contracts across expiries, strikes and dates, including contracts no longer in the current instrument master — recording requested vs returned candles, coverage dates, missing intervals, symbol/token resolution method, API errors/rate limits and reproducibility; and (b) measure usable, gap-audited 5m/15m **volume** history per instrument (including recently added constituents and holiday/missing-bar sessions) to settle the RVOL baseline sample counts of §6.1. These Gate 0 findings resolve F7/F8; they are not Gate 2 blockers. **Must also prove the §4A gap-recovery / Live Readiness Gate**, with acceptance tests for: (i) app starts ~30 min late mid-session; (ii) cold start after a long absence / next trading day, where calendar gaps are not treated as missing bars; (iii) WebSocket disconnect while running, with bars arriving during REST backfill (REST↔stream seam closed); (iv) restart during an incomplete recovery run (idempotent resume); (v) duplicate, out-of-order, missing, stale and conflicting overlap candles; (vi) API rate-limit / partial historical response / unavailable historical range; (vii) one constituent incomplete while the other 49 are current (and the §4A.4 halt vs unverified-gap distinction); (viii) all 50 symbols × both timeframes synchronize, indicators warm, and only then LIVE is granted; (ix) a new gap or stale feed after LIVE immediately revokes readiness and blocks new signals. **Acceptance:** in every incomplete, ambiguous or failed recovery case the system stays visibly NOT LIVE and emits no actionable signal; LIVE is reached only after validated, gap-free data through a common completed-bar watermark and successful warm-up. **Must empirically prove with SmartAPI** (do not assume): the latency between a candle's close and its availability in the historical endpoint (the window the WS buffer must cover), the real per-cold-start request budget for 50×2 instrument-timeframes under the 3 req/s · 180/min limit, instrument-master/token refresh correctness, and WS-to-canonical-bar volume semantics.
 - **Gate 1 — Scanner:** Build 50-stock table and 15m features; test data quality and ranking reproducibility. Include the §6.2 neutral band (F5). RVOL scoring stays disabled until the F8 data audit and an approved missing-feature policy exist.
 - **Gate 2 — Deterministic structure:** Implement pivots/BOS/CHoCH/OB/FVG as pure functions with hand-checked fixtures and no-look-ahead tests. **Fixtures must cover both directions and (F1–F4):** NEUTRAL establishment, protected-swing selection, CHoCH reversal and immediate re-arming, multi-candle displacement OB anchoring on D1, equal-extreme liquidity pools, no-look-ahead pivot confirmation, and the two §7.3 determinism cases — `STRUCTURE_AMBIGUOUS_DOUBLE_BREAK` (degenerate overlap in NEUTRAL: no BOS, stay NEUTRAL) and `STRUCTURE_PROTECTION_PENDING` (CHoCH with no available new protected pivot, plus the later continuation BOS that clears the flag). Fixtures must assert the `protection_pending` flag transitions (false→true on the CHoCH, true→false on the repopulating BOS) in both the BULL→BEAR and BEAR→BULL directions, not only the emitted event codes.
 - **Gate 3 — Tradability and derivative mapping:** Add 5m entry state machine, contract eligibility and risk/cost estimates.
@@ -546,3 +588,5 @@ Owner-directed corrections after v0.2 approval. Smallest-necessary changes; no u
 | Timeframe | Finalized 5m/15m as the sole configuration (no parallel 1/5 mode). Rationale and trade-offs recorded in `DECISION_LOG.md` DEC-005 and `comms/claude/003-timeframe-decision-review.md`. 1m retained only as a possible Gate 5 execution-timing experiment, never a parallel mode. | A-03, DEC-005 |
 
 New structure-engine event codes introduced: `STRUCTURE_AMBIGUOUS_DOUBLE_BREAK`, `STRUCTURE_PROTECTION_PENDING`. These are persisted structure events (§12), distinct from §8 NO_TRADE reason codes.
+
+| §4A | Added **Startup gap recovery and Live Readiness Gate** (owner requirement 2026-11-04): explicit readiness states, idempotent recovery sequence, hard no-live/no-signal rule, audit trail; dashboard Live Readiness banner (§13); Gate 0 recovery acceptance tests + SmartAPI proof items (§15); suppression/halt reason codes (§8). Includes a flagged **co-owner decision (§4A.4)** distinguishing an unverified gap (blocks global LIVE) from a confirmed no-data halt/illiquid bucket (marks the symbol non-eligible, config `halt_blocks_global_live=false`), with the trade-off stated for human-owner override. | §4A, §8, §13, §15 |
