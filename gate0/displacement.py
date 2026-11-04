@@ -145,16 +145,27 @@ def detect_displacement(
             raise ValueError(f"off-grid OHLC at {b.bar_start_ts.isoformat()}")
 
     instrument = bars[0].instrument_id
+
+    # D: reject duplicate pivot IDs instead of silently overwriting them.
+    seen_pivot_ids: set[str] = set()
+    for p in structure.pivots:
+        if p.pivot_id in seen_pivot_ids:
+            raise ValueError(f"duplicate pivot ID in StructureResult: {p.pivot_id}")
+        seen_pivot_ids.add(p.pivot_id)
     pivot_by_id = {p.pivot_id: p for p in structure.pivots}
 
     # Locate each bar within its session segment (amendment 1/6: calendar segmentation).
     segments = _segment(bars, calendar, "5m")
-    seg_of: dict[datetime, tuple[int, int]] = {}  # bar_start_ts -> (segment idx, index in segment)
+    seg_of: dict[datetime, tuple[int, int]] = {}      # bar_start_ts -> (segment idx, index in segment)
+    seg_of_start: dict[datetime, int] = {}             # bar_start_ts -> segment idx (A1: pivot_time lookup)
+    seg_of_end: dict[datetime, int] = {}               # bar_end_ts -> segment idx (A2: confirmation_time lookup)
     atr_by_seg: list[list[float | None]] = []
     for s_idx, seg in enumerate(segments):
         atr_by_seg.append(_atr_series(seg))
         for b_idx, b in enumerate(seg):
             seg_of[b.bar_start_ts] = (s_idx, b_idx)
+            seg_of_start[b.bar_start_ts] = s_idx
+            seg_of_end[b.bar_end_ts] = s_idx
 
     seen_bos: set[str] = set()
     out: list[Displacement] = []
@@ -193,6 +204,31 @@ def detect_displacement(
         # D1: event level price must match the referenced pivot price
         if Decimal(str(ev.level_price)) != Decimal(str(piv.price)):
             raise ValueError("BOS level price does not match the referenced pivot price")
+
+        # A: pivot_time and confirmation_time must exactly match a supplied bar's
+        # bar_start_ts / bar_end_ts respectively. Reject unknown timestamps outright
+        # (chronological plausibility alone is not evidence of membership).
+        if piv.pivot_time not in seg_of_start:
+            raise ValueError(f"pivot_time {piv.pivot_time.isoformat()} matches no supplied bar start")
+        if piv.confirmation_time not in seg_of_end:
+            raise ValueError(f"confirmation_time {piv.confirmation_time.isoformat()} matches no supplied bar end")
+
+        # B: strict chronology pivot_time < confirmation_time < BOS bar_start_ts.
+        if not (piv.pivot_time < piv.confirmation_time < ev.bar_start_ts):
+            raise ValueError(
+                "invalid chronology: require pivot_time < confirmation_time < BOS bar_start_ts"
+            )
+
+        # C: pivot bar, confirmation bar and BOS bar must all be in the same
+        # uninterrupted calendar segment (reuse the existing segmentation; no
+        # separate segmentation definition).
+        pivot_seg = seg_of_start[piv.pivot_time]
+        conf_seg = seg_of_end[piv.confirmation_time]
+        bos_seg = seg_of_start[ev.bar_start_ts]
+        if not (pivot_seg == conf_seg == bos_seg):
+            raise ValueError(
+                "pivot/confirmation/BOS bars span a session boundary or missing-slot gap"
+            )
 
         s_idx, e_idx = seg_of[ev.bar_start_ts]
         seg = segments[s_idx]
