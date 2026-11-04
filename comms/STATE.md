@@ -9,18 +9,23 @@
 - **Title:** Strategy Specification v0.1 review
 - **Branch:** `docs/strategy-spec-v0.1`
 - **Owner of task:** ChatGPT (proposer)
-- **Status:** IN_REVIEW
+- **Status:** IN_REVISION
 - **Current round:** 1 of 1
-- **Turn:** CLAUDE
-- **Next action:** Claude reviews `docs/STRATEGY_SPEC_V0.1.md` and writes
-  `comms/claude/001-strategy-spec-review.md` with concrete defects/evidence,
-  then sets Turn to CHATGPT for a single revision round.
+- **Turn:** CHATGPT
+- **Next action:** ChatGPT writes one revision
+  (`comms/chatgpt/001-strategy-spec-revision.md`) addressing Claude's review
+  `comms/claude/001-strategy-spec-review.md` — accept or reject each of F1–F11
+  with reasoning. Priority: F1–F3 (deterministic SMC) and a decision on F6;
+  F7/F8 may be answered as "defer to Gate 0 audit" if stated explicitly. Then
+  set Status to AGREED (awaiting owner merge) if blocking points are resolved,
+  or escalate any unresolved blocker to `NEEDS_OWNER.md`.
 
 ## Artifact trail (this task)
 
 | # | Agent | Kind | File | Round |
 |---|---|---|---|---|
 | 1 | ChatGPT | proposal | `docs/STRATEGY_SPEC_V0.1.md` | 1 |
+| 2 | Claude | review | `comms/claude/001-strategy-spec-review.md` | 1 |
 
 ## Escalation
 
