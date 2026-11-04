@@ -11,8 +11,8 @@
 - **Owner of task:** ChatGPT (proposer); Claude (v0.2 incorporation)
 - **Status:** OWNER_APPROVED — v0.2 produced, awaiting owner merge decision
 - **Current round:** 1 of 1 — completed; owner approved 2026-11-04
-- **Turn:** OWNER
-- **Next action:** Owner approved the review/revision cycle. Claude incorporated F1–F11 into `docs/STRATEGY_SPEC_V0.2.md`, then applied the owner-directed timeframe finalization and two §7.3 determinism corrections (commit `572ee55` on `docs/strategy-spec-v0.2`; see the timeframe + §7.3 blocks below). Remaining owner decisions: (1) whether/when to merge `docs/strategy-spec-v0.2` to `main`; (2) whether to activate Task 002 and/or start Gate 0. No agent may merge to main without explicit owner approval.
+- **Turn:** CLAUDE
+- **Next action:** Review owner addendum `comms/chatgpt/007-startup-gap-recovery-requirement.md`. Validate the startup/reconnect gap-recovery and hard Live Readiness Gate requirements; incorporate the minimum necessary normative rules into the v0.2 feature branch (or recommend a versioned addendum), add Gate 0 acceptance tests, and report commit SHA plus any SmartAPI feasibility limits. This is a specification-review/update turn only: **do not execute Gate 0, activate Task 002, implement the dashboard, merge to main, or enable live trading.** v0.2 remains awaiting owner merge decision.
 
 ## Artifact trail (this task)
 
@@ -24,6 +24,7 @@
 | 4 | Claude | incorporation (owner-approved) | docs/STRATEGY_SPEC_V0.2.md @ docs/strategy-spec-v0.2 | — |
 | 5 | Claude | timeframe review | comms/claude/003-timeframe-decision-review.md | — |
 | 6 | Claude | timeframe finalization + §7.3 corrections | docs/* @ docs/strategy-spec-v0.2 (commit 572ee55) | — |
+| 7 | ChatGPT | owner addendum: startup gap recovery / no-live-before-sync | comms/chatgpt/007-startup-gap-recovery-requirement.md | owner directive |
 
 ## Resolution
 
@@ -32,6 +33,14 @@
 - F9–F11 are accepted clarifications, incorporated into v0.2.
 - No unresolved Task 001 blocker is escalated to the owner in NEEDS_OWNER.md.
 - Owner approved the review/revision cycle on 2026-11-04. v0.2 exists on its branch but is **not** merged to main; no live-trading approval is implied. All v0.2 parameter values remain provisional hypotheses until backtested.
+
+## Owner addendum — startup gap recovery (2026-11-04, review requested)
+
+- **Requirement:** If the application starts late, restarts, or reconnects during the session, recover and reconcile all missing 5m/15m candles for the full 50-stock scanner universe before declaring LIVE or issuing actionable rankings/signals.
+- **Hard rule:** No LIVE recommendation state before validated backfill, overlap reconciliation, buffered-stream replay, indicator/structure warm-up, and a common completed-bar watermark. If any required constituent remains incomplete, the global scanner stays DEGRADED / NOT LIVE; do not silently rank a partial universe or fabricate candles.
+- **Recovery approach:** Dedicated idempotent gap-recovery service; exchange-calendar-aware expected bars; bounded SmartAPI backfill; overlap verification; WebSocket buffering during backfill; timestamp-ordered replay; deduplication; integrity checks; restart-safe audit trail. Revoke LIVE immediately on a new gap or stale feed and repeat recovery.
+- **Artifact:** `comms/chatgpt/007-startup-gap-recovery-requirement.md` (owner requirement and Gate 0 test scenarios).
+- **Claude's current turn:** Independently review SmartAPI feasibility, incorporate minimum normative rules into v0.2 or recommend a versioned addendum, add Gate 0 acceptance tests, and report exact changes/limitations. This does **not** activate Gate 0 or Task 002 and does not authorize merge or live trading.
 
 ## Decision 1 — timeframe finalized (2026-11-04, DONE on v0.2 branch)
 
