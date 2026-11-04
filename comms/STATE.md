@@ -30,3 +30,13 @@
 
 `IN_PROPOSAL` · `IN_REVIEW` · `IN_REVISION` · `AGREED` (awaiting owner merge) ·
 `BLOCKED_OWNER` (see `NEEDS_OWNER.md`) · `IDLE` (no active task)
+
+## Queued task (not active until Task 001 completes)
+
+- **Task ID:** 002
+- **Title:** Single-page live dashboard and instrument-detail design
+- **Proposal:** `comms/chatgpt/002-live-dashboard-proposal.md`
+- **Shared product brief:** `comms/PRODUCT_BRIEF.md`
+- **Status:** QUEUED
+- **Activation rule:** Do not interrupt Task 001 or change its current turn. Once Task 001 completes its one review/revision cycle, the next ChatGPT turn should activate Task 002 and assign the review turn to Claude.
+- **Scope reminder:** The strategy specification is a discussion/research baseline, not a locked implementation contract. Task 002 must be designed against the owner's product goal in `comms/PRODUCT_BRIEF.md`.
