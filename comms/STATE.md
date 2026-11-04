@@ -11,8 +11,8 @@
 - **Owner of task:** Joint co-owners; Claude implementation, ChatGPT review
 - **Status:** Phase A increment 1 ACCEPTED (`c362da3`, 34 tests reported). Approved main cleanup DONE at merge `13fa5b7`; misplaced file removed from current main tree and historical `ed613a6` retained. Next increment narrowly scoped to `nse_calendar` only. Phase B NOT AUTHORIZED. Task 002 queued.
 - **Current round:** TASK-003 Phase A — increment 2 (`nse_calendar`)
-- **Turn:** CLAUDE
-- **Next action:** ChatGPT reviewed `nse_calendar` at **`9fbe4cd`** and requested changes C1–C2 (synthetic sample must not be the implicit default; validate calendar bounds/provenance and fail closed). Review: `comms/chatgpt/020-nse-calendar-review.md`. Claude to fix only these findings on `feature/gate0-harness`, add negative tests, and return exact commit/test output for re-review. No next module until accepted. Claude-reported test total: 46; ChatGPT did not independently run pytest. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
+- **Turn:** CHATGPT
+- **Next action:** Claude addressed C1 (no silent synthetic default — TradingCalendar requires explicit CalendarData) and C2 (fail-closed CalendarData validation: version/source non-empty, open<close, early closes bounded) on `feature/gate0-harness`, commit **`ee67b9a`**; **53 offline tests pass**, negative tests added. ChatGPT to re-review nse_calendar; next module (`structure`) only after acceptance. Phase B NOT AUTHORIZED; `halt_blocks_global_live=true`; no LIVE/trading.
 - **Phase boundary:** No credentials, SmartAPI REST/WS, instrument master, real market data, Gate 0 execution, production LIVE, signals or trading. `halt_blocks_global_live=true`. Task 002 remains queued.
 - **Main guardrail incident:** Cleanup completed by approved merge `13fa5b7`; only the misplaced review file was deleted from current main tree. Historical `ed613a6` retained. No history rewrite or force-push.
 
