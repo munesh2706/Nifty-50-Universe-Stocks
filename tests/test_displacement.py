@@ -200,3 +200,94 @@ def test_deterministic_repeatable():
     a, b = run(bars, s), run(bars, s)
     assert [d.displacement_id for d in a] == [d.displacement_id for d in b]
     assert a[0].displacement_id == b[0].displacement_id
+
+
+# ----- D1: BOS/pivot coherence & confirmation-timing -----
+
+def _struct(bar, type_, direction, level, kind, conf, price, level_id="SYNTH:p:X"):
+    piv = Pivot(kind, price, NORMAL, conf, level_id)
+    ev = StructureEvent(type_, bar.bar_start_ts, direction, level, level_id)
+    return StructureResult(events=[ev], pivots=[piv], pools=[])
+
+
+def test_d1_bos_up_with_low_pivot_raises():
+    bars = build(WARMUP + [(100.00, 101.00, 100.00, 101.00)])
+    s = _struct(bars[14], BOS_UP, "up", 100.50, "low", NORMAL, 100.50)  # wrong pivot kind
+    with pytest.raises(ValueError):
+        run(bars, s)
+
+
+def test_d1_type_direction_mismatch_raises():
+    bars = build(WARMUP + [(100.00, 101.00, 100.00, 101.00)])
+    s = _struct(bars[14], BOS_UP, "down", 100.50, "high", NORMAL, 100.50)
+    with pytest.raises(ValueError):
+        run(bars, s)
+
+
+def test_d1_pivot_not_confirmed_before_bos_raises():
+    bars = build(WARMUP + [(100.00, 101.00, 100.00, 101.00)])
+    s = _struct(bars[14], BOS_UP, "up", 100.50, "high", bars[14].bar_start_ts, 100.50)  # conf == BOS bar
+    with pytest.raises(ValueError):
+        run(bars, s)
+
+
+def test_d1_level_price_mismatch_raises():
+    bars = build(WARMUP + [(100.00, 101.00, 100.00, 101.00)])
+    s = _struct(bars[14], BOS_UP, "up", 100.50, "high", NORMAL, 100.55)  # level != pivot price
+    with pytest.raises(ValueError):
+        run(bars, s)
+
+
+def test_d1_off_tick_level_raises():
+    bars = build(WARMUP + [(100.00, 101.00, 100.00, 101.00)])
+    s = _struct(bars[14], BOS_UP, "up", 100.53, "high", NORMAL, 100.53)  # off-grid price
+    with pytest.raises(ValueError):
+        run(bars, s)
+
+
+def test_d1_valid_timing_qualifies():
+    bars = build(WARMUP + [(100.00, 101.00, 100.00, 101.00)])
+    s = _struct(bars[14], BOS_UP, "up", 100.50, "high", NORMAL, 100.50)  # confirmed well before
+    assert len(run(bars, s)) == 1
+
+
+# ----- D2: deterministic decimal threshold (guards binary FP, e.g. 0.7*0.1) -----
+
+def test_d2_nonround_mult_exact_equality_qualifies():
+    # threshold = 1.5 * 0.10 = 0.15; net body 0.15 must qualify under exact decimal
+    # comparison (naive binary float 1.5*0.1 == 0.15000000000000002 would wrongly reject).
+    bars = build(WARMUP + [(100.00, 100.15, 100.00, 100.15)])
+    s = structure_for(bars[14], "up", 100.05)
+    assert len(run(bars, s, displacement_atr_mult=1.5)) == 1
+
+
+def test_d2_just_below_rejects():
+    bars = build(WARMUP + [(100.00, 100.10, 100.00, 100.10)])  # body 0.10 < 0.15
+    s = structure_for(bars[14], "up", 100.05)
+    assert run(bars, s, displacement_atr_mult=1.5) == []
+
+
+# ----- D3: extra coverage -----
+
+def test_d3_missing_slot_resets_atr():
+    seg_a = build(WARMUP, start=NORMAL)                                   # 14 bars 09:15..
+    disp = build([(100.00, 101.00, 100.00, 101.00)],
+                 start=NORMAL + timedelta(minutes=5 * 15))                # skip one slot -> new segment
+    bars = seg_a + disp
+    s = structure_for(disp[0], "up", 100.50)  # BOS is first bar of a fresh segment -> no warm-up
+    assert run(bars, s) == []
+
+
+def test_d3_bearish_multicandle():
+    d1 = (100.00, 100.00, 99.90, 99.90)   # body 0.10 down
+    d2 = (99.90, 99.90, 99.85, 99.85)     # body 0.05 down (alone < 0.10)
+    bars = build(WARMUP + [d1, d2])
+    res = run(bars, structure_for(bars[15], "down", 99.95))
+    assert len(res) == 1 and res[0].direction == "down" and len(res[0].bar_ids) == 2
+
+
+def test_d3_opposite_candle_interrupts():
+    d1 = (100.00, 100.10, 100.00, 100.10)       # up
+    opp = (100.10, 100.15, 99.95, 100.00)       # down body -> breaks a bullish sequence
+    bars = build(WARMUP + [d1, opp])
+    assert run(bars, structure_for(bars[15], "up", 100.05)) == []

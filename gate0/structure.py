@@ -202,6 +202,11 @@ def _run_state_machine(seg: list[Bar], pivots: list[Pivot], tick: float, buffer_
     state = "NEUTRAL"
     protected_low: Pivot | None = None
     protected_high: Pivot | None = None
+    # NOTE: `protection_pending` is a DEFENSIVE INVARIANT / state guard, not an
+    # ordinarily reachable transition: under the agreed "latest-confirmed-swing"
+    # semantics within a segment, establishing a directional state always leaves a
+    # confirmed opposite pivot behind, so the repopulation branch does not return
+    # null in normal data. It is retained per the agreed §7.3 contract.
     protection_pending = False
     # C1 + C7: consumption is event-scoped. A pivot consumed as a BOS level must
     # still be usable later as a CHoCH protected level (and vice versa).

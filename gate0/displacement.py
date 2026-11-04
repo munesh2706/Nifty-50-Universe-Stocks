@@ -25,8 +25,10 @@ Disposable audit tool; Python is not a production-stack decision (spec §14 open
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 
 from gate0.canonical_bars import Bar, validate_series
 from gate0.nse_calendar import TradingCalendar
@@ -114,7 +116,6 @@ def detect_displacement(
         raise ValueError("an explicit TradingCalendar is required")
     if not isinstance(structure, StructureResult):
         raise ValueError("a StructureResult is required")
-    import math
     if not (isinstance(displacement_atr_mult, (int, float)) and math.isfinite(displacement_atr_mult)
             and displacement_atr_mult > 0):
         raise ValueError("displacement_atr_mult must be a finite positive number")
@@ -136,7 +137,7 @@ def detect_displacement(
             raise ValueError(f"off-grid OHLC at {b.bar_start_ts.isoformat()}")
 
     instrument = bars[0].instrument_id
-    pivot_ids = {p.pivot_id for p in structure.pivots}
+    pivot_by_id = {p.pivot_id: p for p in structure.pivots}
 
     # Locate each bar within its session segment (amendment 1/6: calendar segmentation).
     segments = _segment(bars, calendar, "5m")
@@ -158,19 +159,38 @@ def detect_displacement(
         if bos_id in seen_bos:
             raise ValueError(f"duplicate BOS event: {bos_id}")
         seen_bos.add(bos_id)
-        # linkage validation (amendment 4)
-        if ev.level_id is None or ev.level_id not in pivot_ids:
+        # linkage validation (amendment 4 + D1 coherence)
+        if ev.level_id is None or ev.level_id not in pivot_by_id:
             raise ValueError(f"BOS references an unresolved pivot: {ev.level_id}")
         if not ev.level_id.startswith(instrument + ":"):
             raise ValueError("BOS pivot belongs to a different instrument")
         if ev.bar_start_ts not in seg_of:
             raise ValueError("BOS confirmation bar not found in the supplied bar stream")
 
+        piv = pivot_by_id[ev.level_id]
+        # D1: event type <-> direction consistency
+        if (ev.type == BOS_UP and ev.direction != "up") or (ev.type == BOS_DOWN and ev.direction != "down"):
+            raise ValueError("BOS event type/direction mismatch")
+        # D1: BOS_UP must reference a high pivot; BOS_DOWN a low pivot
+        if piv.kind != ("high" if direction == "up" else "low"):
+            raise ValueError("BOS direction does not match the referenced pivot kind")
+        # D1: pivot must be confirmed strictly before the BOS confirmation bar
+        if piv.confirmation_time >= ev.bar_start_ts:
+            raise ValueError("referenced pivot was not confirmed before the BOS bar")
+        # D1: finite, positive, on-tick event and pivot prices
+        for pr in (ev.level_price, piv.price):
+            if pr is None or not (isinstance(pr, (int, float)) and math.isfinite(pr)) or pr <= 0 \
+                    or not _on_grid(pr, tick_size):
+                raise ValueError("BOS/pivot price must be finite, positive and on-tick")
+        # D1: event level price must match the referenced pivot price
+        if Decimal(str(ev.level_price)) != Decimal(str(piv.price)):
+            raise ValueError("BOS level price does not match the referenced pivot price")
+
         s_idx, e_idx = seg_of[ev.bar_start_ts]
         seg = segments[s_idx]
         atr = atr_by_seg[s_idx]
         end_bar = seg[e_idx]
-        level = ev.bos_level_price if hasattr(ev, "bos_level_price") else ev.level_price
+        level = ev.level_price
 
         # final close must be beyond the BOS swing level in the BOS direction
         if direction == "up" and not (end_bar.close > level):
@@ -189,12 +209,16 @@ def detect_displacement(
             if not all(_positive_body(b, direction) for b in seq):
                 continue
             first, final = seq[0], seq[-1]
-            net_body = (final.close - first.open) if direction == "up" else (first.open - final.close)
-            if net_body <= 0:
+            # D2: deterministic decimal comparison (no binary FP, no epsilon).
+            net_body_dec = (Decimal(str(final.close)) - Decimal(str(first.open))) if direction == "up" \
+                else (Decimal(str(first.open)) - Decimal(str(final.close)))
+            if net_body_dec <= 0:
                 continue
             atr_before = atr[d1 - 1]
-            threshold = displacement_atr_mult * atr_before
-            if net_body >= threshold:
+            threshold_dec = Decimal(str(displacement_atr_mult)) * Decimal(str(atr_before))
+            net_body = float(net_body_dec)
+            threshold = float(threshold_dec)
+            if net_body_dec >= threshold_dec:
                 chosen = Displacement(
                     displacement_id=f"{bos_id}:DISP",
                     direction=direction,
