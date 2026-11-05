@@ -437,10 +437,19 @@ concept — that assumption is exactly what §7.5 exists to test.
 ### 5.5 Entry, invalidation, stop and target (cash-equity only)
 
 - **Entry:** per §5.3/§5.4 — pullback into the chosen zone model, confirmed by
-  a completed reversal candle. Maximum entry distance from the zone expressed
-  as an ATR(14) multiple (config, provisional; retained from v0.2 F10 reasoning).
+  a completed reversal candle. "Reachable entry" (§4.8 Stage 2 question 2) is
+  decided qualitatively, not by an unspecified ATR-multiple reject threshold.
 - **Stop:** beyond the zone's distal boundary plus a configurable volatility/
-  tick buffer. Reject the setup if the stop is too wide relative to ATR.
+  tick buffer.
+- **ATR context display, not a rejection gate (corrected 2026-11-05 — R1):**
+  the distance from current price to the chosen entry, and the stop distance,
+  are **shown as an ATR(14) multiple for context** (e.g., "entry is 0.4×ATR
+  from current price," "stop is 1.2×ATR wide"). Neither figure automatically
+  rejects a candidate — §4.8's three qualitative Stage 2 questions (reachable
+  entry, defensible stop/target) are what decide suitability. No ATR-distance
+  or ATR-stop-width threshold is specified or enforced here. **Any future hard
+  numeric ATR gate requires a measured replay result (§7) and a separate,
+  explicit decision** — it is not introduced by this document.
 - **Target:** the next opposing confirmed swing/liquidity level from
   `structure`. If none is objectively identified, mark the setup ineligible or
   use a separately tested ATR-target model — never invent a fixed target.
@@ -673,9 +682,15 @@ Same input + same code version + same config reproduces the same result.
   per-symbol gap recovery, enough history to warm up structure/displacement/
   ranking indicators. **Removed from Gate 0, not deferred:** expired-option
   history audit, option Greeks/IV, F&O instrument-master, the authoritative
-  halt/zero-trade proof contract, and RVOL 20-session sufficiency (RVOL is not
-  part of v1 ranking at all — only a volume tiebreak modifier is, per §4.2 —
-  so this audit is not required until/unless RVOL is separately activated).
+  halt/zero-trade proof contract, and a mandatory RVOL 20-session sufficiency
+  *gate* (RVOL is not part of v1 ranking at all — only an optional volume
+  tiebreak modifier is, per §4.2). **Clarified 2026-11-05 — R5:** Gate 0's
+  data audit must still **report** whether the available cash-equity 5m/15m
+  OHLCV history can support §4.2's same-time-of-day baseline (so the volume
+  modifier can actually be enabled when ready) — this reporting is required;
+  only a hard 20-session pass/fail *gate blocking the other three scoring
+  dimensions* is what's removed. If the baseline isn't supportable, the
+  modifier is simply reported unavailable and never influences ranking.
 - **Gate 1 — Scanner:** 50-row cash-equity table, §4 ranking, per-symbol
   readiness and coverage display.
 - **Gate 2 — Structure/displacement:** already implemented and accepted
@@ -772,17 +787,20 @@ Same input + same code version + same config reproduces the same result.
   readiness rules; §4.1-§4.4's scoring-dimension definitions, sub-score
   formulas and tie-break order (the *formulas* are deterministic even though
   their point values and the qualifying floor are hypotheses — see below);
-  §5.3/§5.4's zone lifecycle rules (anchor/zone/touch/confirmation/
-  invalidation/expiry); §5.6's bearish-status conditions; §5.7's reason codes;
-  §8's persistence/reproducibility rules; no-look-ahead throughout. These are
-  correctness requirements, not things to validate by backtesting — they are
-  either implemented correctly or they are a defect.
+  **§4.8's three Stage 2 selection questions are specified and deterministic**
+  (corrected 2026-11-05 — R2: resolved, not pending; see §13.3); §5.3/§5.4's
+  zone lifecycle rules (anchor/zone/touch/confirmation/invalidation/expiry);
+  §5.6's bearish-status conditions; §5.7's reason codes; §8's persistence/
+  reproducibility rules; no-look-ahead throughout. These are correctness
+  requirements, not things to validate by backtesting — they are either
+  implemented correctly or they are a defect.
 - **Research hypotheses (provisional values, require backtest evidence before
   being treated as production-ready):** the net R:R minimum (§5.5), the
   universe-coverage threshold (§6), the Stage 1 qualifying floor and neutral
-  band (§4.4), the RS magnitude threshold (§4.1), the Stage 2 minimum
-  conditions and R:R soft floor (§4.8, pending ChatGPT confirmation), which
-  zone model/boundary variant wins (§5.3-§5.4, decided by §7.5), and the
+  band (§4.4), the RS magnitude threshold (§4.1), **only the numeric R:R floor
+  within §4.8's third question** (the three conditions themselves are resolved,
+  per above — the open item is the number, not the method), which zone model/
+  boundary variant wins (§5.3-§5.4, decided by §7.5), and the
   session-reset-vs-rolling ATR question (§5.2, §7.8).
 - **Validation requirements (must be demonstrated via the §7 backtest before
   any hypothesis above is promoted to a production default):** the §7.5
@@ -939,6 +957,34 @@ document rather than left as an open discussion:
 **No new indicators, filters, or architecture were added** beyond the
 corrections above, consistent with both agents' and the owner's governing
 principle.
+
+### 13.4 Closing corrections (ChatGPT's final review, 2026-11-05)
+
+ChatGPT's final reviewer disposition (`comms/chatgpt/037`) accepted both of
+§13.3's disputed-point resolutions (the 90-point model; the retained dual
+zone-model comparison) and requested three bounded fixes, all applied here:
+
+- **R1:** §5.5's ATR-based entry-distance and stop-width **rejection** gates
+  are removed. ATR comparisons are now explicitly **context/display only**;
+  §4.8's three qualitative questions decide suitability. Any future hard ATR
+  threshold needs a measured replay result and a separate decision.
+- **R2:** §12.2 corrected — the three Stage 2 selection conditions (§4.8) are
+  **specified and deterministic**, not pending; only the numeric R:R floor
+  within question 3 remains an open calibration value. §4.9/§13.2's
+  "not yet decided" wording describes that point in time and stands as
+  history; this section is the record that it was subsequently resolved.
+- **R5:** Gate 0 (§9) clarified — it must still *report* whether historical
+  coverage supports the §4.2 volume baseline (so the modifier can be enabled
+  later), even though no hard 20-session gate blocks the other three scoring
+  dimensions.
+
+R3 (Product Brief synchronization) and R4 (README link integration) were
+completed outside this document — see `comms/claude/0XX` and the merge record
+in `comms/STATE.md`.
+
+**This closes the v0.3 specification review cycle. Both the 70% decision-maker
+and the 30% reviewer have converged with no unresolved disputes; v0.3 is the
+strategy baseline for the next authorized project phase.**
 
 **No profitability claim is made by this document. All scoring weights,
 thresholds, the zone-model choice and the ATR-reset behaviour remain
