@@ -4,3 +4,5 @@ __pycache__/
 .env
 *.local.env
 secrets*
+candle-coverage.csv
+instrument_master.csv
