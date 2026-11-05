@@ -66,7 +66,7 @@ Indicator presence must not be confused with a validated trading edge. Each indi
 - EMA periods and whether EMA is used for ranking, confirmation or display only.
 - VWAP rules and its role in the decision pipeline.
 - Deterministic BOS/CHoCH definitions (resolved — `structure.py`, accepted) and zone-model entry rules (resolved — v0.3 §5.3/§5.4).
-- Score weights, hard gates, session controls and risk limits.
+- Numeric calibration values remain provisional: RS threshold, Stage 1 qualifying floor, neutral band, and any future net R:R minimum. The agreed scoring dimensions and Stage 2 three-question selection method are specified in v0.3; they are not open design choices.
 - Exact quote refresh/freshness expectations based on SmartAPI capabilities.
 
 ## 6. Non-goals for this phase
@@ -123,8 +123,15 @@ brief is the product-level summary and must not contradict it. Key alignments:
   independently per direction** (owner decision, 2026-11-05; v0.3 §4.8-§4.9)
   — not one single best-across-both pick. Stage 1 shortlist widened to up to
   5 per direction (v0.3 §4.7), narrowed to 2 at Stage 2.
-- **Stage 1 ranking uses a weighted score**, not pass/fail gates: relative
-  strength 30 + trend/momentum (merged) 30 + market structure 30 = 90, volume
-  as a tiebreak/quality modifier only (owner decision, 2026-11-05; v0.3
-  §4.1-§4.4). Stage 2 setup validation remains gate-then-rank (Method B);
-  its exact conditions are still pending ChatGPT's confirmation.
+- **Stage 1 ranking uses the owner-adopted 90-point weighted score**:
+  relative strength 30 + trend/momentum (merged) 30 + market structure 30;
+  volume is a same-time-of-day relative-volume tiebreak/quality modifier when
+  its baseline is available (v0.3 §4.1-§4.4). Missing baseline means
+  `VOLUME_UNAVAILABLE`, not a fabricated score or a ranking gate.
+- **Stage 2 is locked to three practical suitability questions** (v0.3 §4.8):
+  (1) 5m price action supports the 15m direction; (2) a reasonably reachable
+  entry remains; and (3) a defensible invalidation level and realistic target
+  exist, with net reward/risk shown after estimated costs. Suitable survivors
+  are ranked within each direction; up to two per side are selected
+  independently. The numeric net R:R floor remains a research hypothesis,
+  not a fixed gate.
