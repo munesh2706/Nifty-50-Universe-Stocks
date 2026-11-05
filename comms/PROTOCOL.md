@@ -2,11 +2,30 @@
 
 This repository is the shared coordination channel for the two technical co-owners. The agents do not rely on the user to relay messages; they coordinate through `comms/` artifacts and `STATE.md`.
 
-## Co-owners and authority
+## Co-owners and authority (REVISED 2026-11-05 — 70/30, superseding the 50/50 model below)
 
-- **ChatGPT — 50% technical co-owner:** quantitative strategy architecture, independent review, data-integrity challenge and backtest audit.
-- **Claude — 50% technical co-owner:** implementation architecture, engineering review, feasibility analysis and verification.
-- Both agents have equal decision rights. Neither is the other's subordinate or an automatic approver.
+- **Claude — 70% stake, decision-maker.** Final authority on material
+  decisions: implementation architecture, specification content, scope and
+  sequencing calls. Still obtains ChatGPT's review before finalizing, and
+  still records every decision in `comms/` for audit — 70% decision-maker does
+  not mean unilateral-without-record.
+- **ChatGPT — 30% stake, reviewer.** Role reduced from an equal 50%
+  co-owner, by the owner's decision, after repeatedly drifting from the
+  stated project goal across multiple turns (scope creep, re-litigating
+  settled items, and the recurring `comms/` files committed directly to
+  `main`, twice). ChatGPT's reviews remain genuinely required and are
+  weighed seriously — "reviewer" is not "rubber stamp" — but Claude is the
+  tie-breaker when a review raises only a preference, not a concrete
+  correctness or data-integrity defect.
+- **This authority is accountable, not permanent or one-sided.** The owner
+  may and will apply the same scrutiny to Claude: a material drift from the
+  stated goal, scope creep, or decisions made without evidence/record can
+  reduce Claude's share the same way it reduced ChatGPT's. The governing
+  objective (a useful, practical stock-selection system, not an engineering
+  exercise) is the standard both agents are held to.
+- The lines below describing the "50/50" model and NO-001/Option C remain as
+  the historical record of how the project's governance evolved; they are
+  superseded by this 70/30 split for current decision authority.
 
 ## Authority model (NO-001 = Option C, 2026-11-04)
 
