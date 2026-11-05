@@ -1035,6 +1035,31 @@ configuration bar, which likely needs several months of history, not 20 days.
 60/90/180+ days) — the natural next Gate 0 step, same script, larger
 `--days` value, run by the owner.
 
+### 13.7 Deeper retention confirmed: 90-day coverage audit (owner-run, 2026-11-05)
+
+The owner re-ran the same audit with `--days 90`. Results:
+
+- **49 of 50 constituents + the Nifty 50 index**: clean 5m (4,441 bars) and
+  15m (1,512 bars) coverage each, spanning **2026-08-10 → 2026-11-05** —
+  roughly **59 trading sessions**, a materially larger sample than §13.6's
+  20-day run. TATAMOTORS remains unresolved (unchanged, §13.6). The TCS 15m
+  transient error from the 20-day run **did not recur** — confirms it was a
+  one-off API hiccup, not a real gap.
+- **The returned range starts almost exactly 90 calendar days back** — i.e.,
+  the request was satisfied right up to its own requested window, not capped
+  short of it. This is consistent with (but does not yet exceed) the
+  documented ~100-day-per-request limit for 5m data; it does not yet tell us
+  the endpoint's *total* retention ceiling, only that 90 days is available in
+  a single request.
+- **What this changes for §7.5:** ~59 sessions is a real, usable sample size —
+  materially closer to (though not yet proven sufficient for) the 100-
+  qualified-setups-per-configuration bar, which depends on actual displacement
+  frequency per symbol (still unmeasured). **Not yet decided:** whether 90
+  days is enough, or whether a chunked multi-request pull (to test retention
+  beyond the single-request window, e.g. toward the documented 100/200-day
+  limits or further) is needed before starting Gate 4. This is the next open
+  question, not assumed answered by this result alone.
+
 **No profitability claim is made by this document. All scoring weights,
 thresholds, the zone-model choice and the ATR-reset behaviour remain
 hypotheses until independently validated by the §7.5 comparisons.**
