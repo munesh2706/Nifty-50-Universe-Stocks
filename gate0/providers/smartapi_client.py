@@ -217,7 +217,7 @@ def _selftest() -> None:  # pragma: no cover - manual, run by the owner only
 
 def _diagnose() -> None:  # pragma: no cover - manual, safe (no secret values printed)
     """Report presence/length only, never real values. Safe for Claude to run."""
-    print(f"dotenv package available: {_DOTENV_PATH is not None or _DOTENV_LOADED or 'dotenv' in globals()}")
+    print(f"dotenv package available: {'load_dotenv' in globals()}")
     print(f".env file found at: {_DOTENV_PATH or '(not found by find_dotenv)'}")
     print(f"load_dotenv() reported it loaded a file: {_DOTENV_LOADED}")
     print(f"current working directory: {os.getcwd()}")
