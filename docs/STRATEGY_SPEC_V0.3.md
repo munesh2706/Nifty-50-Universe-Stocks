@@ -40,8 +40,8 @@
 | A-07 | Every signal persisted with input references and config/strategy version. |
 | A-08 | Every NO TRADE / rejection carries a reason code. |
 | A-09 | No automated order placement — permanent scope boundary, not pending (re-affirms DEC-012). |
-| A-10 | Up to three bullish and three bearish candidates; never padded. |
-| A-11 | Select one best qualified candidate across both directions, or NO TRADE. |
+| A-10 | **(Superseded 2026-11-05, owner decision — see §4.9)** Stage 1 (15m) shortlists up to **five** bullish and five bearish candidates; Stage 2 (5m) narrows each to up to **two** final candidates per direction; never padded at either stage. |
+| A-11 | **(Superseded 2026-11-05, owner decision — see §4.9)** The system returns up to two bullish and up to two bearish final candidates independently — there is no single "best across both directions" pick. Each direction returns `NO_TRADE` independently if nothing qualifies on that side. |
 
 **Removed from v0.2, not carried forward (binding boundary, stated above):** all
 derivative-contract decisions, option/futures R:R split, F&O availability
@@ -53,7 +53,7 @@ scanner's output is tied to a tradable derivative contract.
 1. Load and version the point-in-time Nifty 50 cash-equity constituent list.
 2. Ingest and validate completed 15m and 5m candles **per symbol, independently**.
 3. Compute 15m directional features and rank eligible symbols (§4).
-4. Show up to three bullish and three bearish candidates (§4.8); never pad.
+4. Show up to five bullish and five bearish candidates at the Stage 1 shortlist (§4.7); never pad.
 5. Evaluate those six on completed 5m candles for structure, displacement,
    setup quality, entry freshness, invalidation and net reward/risk (§5).
 6. Select the single best qualified candidate across both directions, or
@@ -106,94 +106,164 @@ and expected-slot computation.
 
 ## 4. Directional ranking (15m)
 
-### 4.1 Mandatory features (deterministic, all required for a valid score)
+**(Owner decision, 2026-11-05, superseding the mandatory-gate design of the
+prior revision of this document — see §4.9.)** Stage 1 uses a **weighted
+score** across three dimensions (90 points total), with volume as a separate
+tiebreak/quality modifier, not a fourth scored dimension. This replaces the
+earlier four-mandatory-pass/fail-gate design.
 
-| # | Feature | Deterministic definition |
-|---|---|---|
-| 1 | Trend alignment | EMA(9) vs EMA(21) ordering on 15m closes (bullish: EMA9>EMA21; bearish: EMA9<EMA21) **and** last completed-15m close vs session VWAP (above = bullish side, below = bearish side). Both sub-conditions must agree with the candidate's direction. |
-| 2 | Relative strength | Stock % return minus Nifty-50-index % return over the **same exact** 15m, 30m and 60m intervals (matched start/end timestamps, not approximate). Bullish requires a positive value on at least 2 of the 3 intervals; bearish requires negative on at least 2 of 3. |
-| 3 | Structure confirmation | `structure.py`'s current state for the symbol (BULL/BEAR, §7.1-§7.3 of the reused module) must agree with the candidate's direction. NEUTRAL state disqualifies that direction for this feature. |
-| 4 | Qualifying displacement present | At least one `displacement.py` event in the candidate direction within the current session segment, with its linked BOS still unconsumed/live (not already expired per §5). |
+### 4.1 Scored dimensions (0-30 points each, 90 total)
 
-**All four are mandatory.** A symbol qualifies for a direction only if all four
-agree. There is no partial-credit weighted score across these four — each is a
-pass/fail gate, not a weighted input, because owner's governing principle 2
-("minimum viable complexity") rules out inventing a weighting/normalization
-scheme with no evidence behind it.
+**Relative strength (0-30):** for each of the three matched intervals (15m,
+30m, 60m — stock % return minus Nifty % return over the exact same start/end
+timestamps), award **10 points** if the sign agrees with the candidate's
+direction **and** the absolute difference is at or above a configurable
+minimum-meaningful threshold (provisional default **0.15%**, a hypothesis to
+calibrate, not locked); otherwise **0** for that interval. Sum across the
+three intervals (max 30).
 
-### 4.2 Optional feature
+**Trend and momentum, merged (0-30):** resolves the double-counting flagged
+in the joint discussion (`comms/claude/030`) by giving the two sub-signals
+genuinely distinct definitions instead of two labels for the same thing:
+- **Trend sub-score (0-15):** 15 if EMA(9) vs EMA(21) ordering on 15m closes
+  agrees with the direction **and** the last completed-15m close is on the
+  correct side of session VWAP (both must hold); otherwise 0. No partial
+  credit within this half.
+- **Momentum sub-score (0-15):** compares the price change over the most
+  recent 3 completed 15m bars against the prior 3 completed 15m bars (is the
+  move accelerating or decelerating) — genuinely different information from
+  Trend, which only measures position/direction, not rate of change. Award
+  **15** if accelerating in the candidate direction, **8** if moving in the
+  candidate direction but decelerating, **0** if moving against the candidate
+  direction.
 
-| Feature | Condition for inclusion |
-|---|---|
-| Volume participation | Included **only** when a same-time-of-day historical volume baseline exists for that symbol/bucket (minimum sample size to be set from Gate 0 data-audit results, §7.6/§9 — not invented here). If the baseline is missing, this feature is **omitted from the score and from the explanation**, never treated as zero or neutral. |
+**Market structure (0-30):**
+- **State sub-score (0-15):** 15 if `structure.py`'s current state for the
+  symbol (BULL/BEAR, §7.1-§7.3) agrees with the candidate direction; 0 if
+  NEUTRAL or disagreeing.
+- **Recency sub-score (0-15):** 15 if a confirmed BOS in the candidate
+  direction occurred within the last 3 completed 15m bars; 8 if within the
+  last 4-10 bars; 0 if none within the last 10 bars or the state disagrees.
+
+### 4.2 Volume — tiebreak / quality modifier only (not part of the 90)
+
+Included **only** when a same-time-of-day historical volume baseline exists
+for that symbol/bucket (minimum sample size set from Gate 0 data-audit
+results, §7.6/§9 — not invented here). When present, it does **not** add to
+the 0-90 score; it is used only (a) to break a tie between two candidates with
+equal total scores (higher relative volume ranks first), and (b) as a shown
+"+"/quality flag in the explanation. When the baseline is missing, this is
+shown as "volume: unavailable" and plays no role at all — never defaulted to
+neutral or zero effect on the score.
 
 No other indicator (RSI, MACD, ADX, Supertrend, FVG, liquidity sweeps, sector
 scoring, RVOL) is part of v1 ranking. Each was a correlated or data-fragile
 addition with no demonstrated incremental value; add any of them later only
 with backtest evidence (§7), never to "make the model appear sophisticated."
 
-### 4.3 Score, explanation, and ranking order
+### 4.3 Missing data
 
-- A candidate that passes all four mandatory gates (§4.1) in one direction is
-  **eligible** in that direction. There is no numeric 0-100 score computed
-  from weights in v1 — scoring by weighted combination was identified as an
-  unjustified complexity (owner principle 2) given only pass/fail gates exist.
-  Instead, each eligible candidate's rank **within its direction** is
-  determined by, in strict priority order: (a) the relative-strength magnitude
-  (feature #2, larger absolute RS wins), then (b) recency of the qualifying
-  displacement (feature #4, more recent wins) as the tie-break. This is fully
-  deterministic and requires no arbitrary weight choice.
-- **Explanation to the user:** for every candidate, show which of the four
-  mandatory features passed with their measured values (EMA9/EMA21/VWAP
-  values, the three RS percentages, the structure state, the displacement
-  event ID) and, if present, the volume baseline comparison. For every
-  **rejected** symbol in the eligible-but-not-shortlisted set, show which
-  mandatory feature(s) failed.
-- **Re-evaluating the weighted-score idea is explicitly deferred**, not
-  forbidden forever: if backtesting (§7) later shows that some mandatory gates
-  predict outcomes better than others, a weighted score may be introduced then,
-  with evidence. It is not invented now.
+If any input required for §4.1's three dimensions (EMA, VWAP, the Nifty
+benchmark return, or `structure.py`'s state) is unavailable for a symbol, that
+symbol is `UNAVAILABLE` per §3.2 and excluded from ranking entirely — never
+scored with partial data. This is distinct from the optional volume modifier
+(§4.2), whose absence does not exclude the symbol, only that one tiebreak/flag.
 
-### 4.4 Missing data
+### 4.4 Qualifying floor and ranking order
 
-If feature #1 or #2's required inputs (EMA, VWAP, or the Nifty benchmark
-return) are unavailable for a symbol, that symbol is `UNAVAILABLE` per §3.2 and
-is excluded from ranking entirely — it is not scored with partial data. This is
-distinct from the optional volume feature (§4.2), whose absence does not
-exclude the symbol, only that one explanation line.
+- A symbol is **eligible** in a direction only if its total score (0-90) is at
+  or above a configurable minimum floor — provisional default **45/90 (50%)**,
+  a hypothesis to calibrate from backtest results (§7), not a final production
+  value.
+- Eligible candidates are ranked within their direction by total score,
+  descending; ties broken by the volume modifier (§4.2) where available, then
+  alphabetically by ticker for display stability only (no selection
+  significance).
+- **A symbol may appear on both lists only if both direction-scores clear the
+  floor and differ by at least a configurable neutral band** (score points,
+  not price) — otherwise it is directionally unclear and excluded from both
+  lists. (Retained from the prior revision's reasoning; value to calibrate.)
 
-### 4.5 Ties
+### 4.5 Explanation to the user
 
-If two candidates tie on both the RS magnitude and displacement recency
-(§4.3), both are shown with the tie stated explicitly in the explanation;
-the one with the earlier symbol ticker (alphabetical) is listed first for
-display stability only — this ordering has no selection significance.
+For every candidate: the three dimension scores and their sub-score
+breakdown (so a user can see *why* a symbol scored as it did), the volume
+modifier state, and the total. For every symbol that scored but did not clear
+the floor or was excluded by the neutral band, show the same breakdown so the
+rejection is as explainable as the selection.
 
-### 4.6 Neutral / conflicting conditions
-
-A symbol whose structure state is NEUTRAL, or whose trend-alignment and VWAP
-sub-conditions disagree with each other, fails feature #1 or #3 and is simply
-**not eligible** in that direction — there is no separate "conflicted" status
-or score penalty. A symbol can be ineligible in both directions simultaneously
-(e.g., NEUTRAL structure); this is the expected, honest outcome, not an error.
-
-### 4.7 Eligibility gates (before ranking, in addition to §4.1)
+### 4.6 Eligibility gates (before scoring, in addition to §4.1-§4.4)
 
 - Symbol readiness per §3.2 (not `UNAVAILABLE`).
 - Indicator/structure warm-up satisfied (§5.1-§5.2 warm-up requirements).
 - Minimum liquidity / acceptable spread proxy.
 - No exchange/broker trading restriction making execution impractical.
 
-### 4.8 Shortlist and strongest-candidate selection
+### 4.7 Stage 1 shortlist
 
-Up to three bullish and three bearish eligible candidates per §4.3's ranking
-order. Show fewer if fewer qualify; never pad with weak names. The **strongest
-candidate across both directions** is selected only after the 5m setup
-evaluation (§5) — directional ranking alone never picks the final candidate,
-per A-04. If the six shortlisted candidates (or however many exist) all fail
-§5's setup/entry requirements, the result is `NO_TRADE` (§5.7) even though
-directional candidates existed — a directional edge is necessary but not
-sufficient.
+Up to **five** bullish and five bearish eligible candidates (§4.4), ranked by
+score. Show fewer if fewer clear the floor; never pad with weak names. This
+Stage 1 shortlist is **not** the final output — it feeds Stage 2 (§5) for
+setup validation.
+
+### 4.8 Stage 2 narrowing and final candidates — pending confirmation
+
+**(Owner decision, 2026-11-05: the final output is up to two bullish and two
+bearish candidates, selected independently — no single "best across both
+directions" pick; see §4.9 and A-10/A-11.)** The exact Stage 2 (5m)
+minimum-suitability conditions and ranking method that narrow the five-per-
+side shortlist down to two per side are proposed in the joint discussion
+(`comms/claude/030-selection-method-discussion-response.md`, "Method B":
+qualitative minimum conditions, then rank survivors by setup quality) but are
+**not yet locked into this specification** — per the owner's "rest check with
+ChatGPT" instruction (2026-11-05), the precise Stage 2 conditions (the 5m/15m
+agreement check, the pullback/entry condition, the invalidation-level
+condition, and the proposed ~1:1 soft reward:risk floor) await ChatGPT's
+confirmation before being written here as settled rules. Until then, §5's
+existing zone-model mechanics (§5.3/§5.4) remain the implemented basis for
+Stage 2 entry/invalidation; only the *selection method on top of them*
+(Method B vs. a pure weighted top-2) is still open.
+
+If both directions' Stage 2 evaluation yields no qualifying candidate, that
+direction independently returns `NO_TRADE` (§5.7) — a directional shortlist
+existing at Stage 1 does not guarantee a Stage 2 result; a directional edge is
+necessary but not sufficient, per A-04.
+
+### 4.9 Record of this revision's decisions (2026-11-05) — including a correction, not just an override
+
+Two items from the joint discussion (`comms/chatgpt`'s "50 to 2" note,
+`comms/claude/030`'s response) are now settled:
+
+1. **The 2+2 independent-direction output (§4.8) is accepted as proposed** —
+   superseding A-10/A-11's prior single-best-pick design. **Owner decision.**
+
+2. **Stage 1 moves from pass/fail gates to a weighted score** (relative
+   strength 30, trend+momentum merged 30, market structure 30; 90 total;
+   volume as a tiebreak/quality modifier only — superseding both the original
+   25/25/20/20/10 proposal and this document's prior four-mandatory-gate
+   design). **This is a design correction on Claude's part, not merely
+   compliance with the owner's preference.** The original gate design applied
+   Stage-2-shaped logic (binary pass/fail, appropriate when validating whether
+   a setup is tradeable *right now*) to a Stage-1 problem (ranking 50 stocks
+   into an ordered shortlist, which structurally needs a scale, not a yes/no
+   set) — and it created a cliff-edge failure mode: a stock strong on three
+   dimensions and borderline on the fourth was discarded identically to one
+   weak on all four, discarding real information a ranking stage should use.
+   It was also inconsistent with this very document's own Stage 2 philosophy
+   (§4.8/§5: don't reject a good setup for one rigid technicality) — Stage 1's
+   gates did exactly that, one stage earlier. The qualifying floor (§4.4,
+   provisional 45/90) keeps the same protection the gates were trying to
+   provide — a weak-everywhere stock still cannot qualify — without the
+   cliff-edge problem. **Decision: weighted scoring for Stage 1 (ranking),
+   gate-then-rank/Method B for Stage 2 (setup validation) — these are
+   different problems and deserve different tools; this is Claude's considered
+   recommendation, independently arrived at, not a reversal under pressure.**
+
+Everything else from the joint discussion (Stage 2 Method B's exact
+conditions, the R:R soft floor, the ATR-wide-stop flag, session-timing
+exclusion windows, the Stage 1 qualifying-floor and neutral-band *values*) is
+explicitly **not yet decided** — per the owner's instruction, those remain
+with ChatGPT for confirmation before being locked into this specification.
 
 ## 5. 5-minute setup: structure, displacement and entry
 
@@ -531,8 +601,9 @@ Same input + same code version + same config reproduces the same result.
   per-symbol gap recovery, enough history to warm up structure/displacement/
   ranking indicators. **Removed from Gate 0, not deferred:** expired-option
   history audit, option Greeks/IV, F&O instrument-master, the authoritative
-  halt/zero-trade proof contract, and RVOL 20-session sufficiency (RVOL itself
-  is optional per §4.1, so its data audit is not required until activated).
+  halt/zero-trade proof contract, and RVOL 20-session sufficiency (RVOL is not
+  part of v1 ranking at all — only a volume tiebreak modifier is, per §4.2 —
+  so this audit is not required until/unless RVOL is separately activated).
 - **Gate 1 — Scanner:** 50-row cash-equity table, §4 ranking, per-symbol
   readiness and coverage display.
 - **Gate 2 — Structure/displacement:** already implemented and accepted
@@ -592,11 +663,11 @@ Same input + same code version + same config reproduces the same result.
    no confirmed signal uses an incomplete bar.
 3. `canonical_bars`, `nse_calendar`, `structure` and `displacement` are used
    unmodified (§3.1, §5.1, §5.2); no material defect was found or introduced.
-4. Bullish/bearish qualification follows §4.1's four mandatory gates
-   deterministically — the same input bars always produce the same
-   qualification result.
-5. Every candidate's ranking is explainable per §4.3 (which features passed,
-   their measured values, the rank order reason).
+4. Bullish/bearish scoring follows §4.1-§4.4's weighted-score and qualifying-
+   floor rules deterministically — the same input bars always produce the
+   same score and the same qualification result.
+5. Every candidate's ranking is explainable per §4.5 (each dimension's
+   sub-score, the volume modifier state, the total, and the rank reason).
 6. The chosen zone model's lifecycle (§5.3/§5.4) transitions correctly and
    one-way: `ACTIVE → TOUCHED → (INVALIDATED|EXPIRED)`.
 7. No look-ahead or repainting: every structure, displacement and zone event
@@ -606,11 +677,15 @@ Same input + same code version + same config reproduces the same result.
    bad symbol never silently disappears or blocks the other 49.
 9. Backtest evaluation uses the cash-equity cost schedule (§7.4) and the
    conservative execution assumptions (§7.3) — not idealized fills.
-10. Up to three bullish and three bearish candidates are shown, never padded
-    (§4.8); fewer than three is an acceptable, expected outcome.
-11. The system selects one best qualified candidate across both directions, or
-    returns `NO_TRADE`/`PARTIAL` with reasons (§5.7, §6) — it never forces a
-    choice when no candidate qualifies.
+10. Up to five bullish and five bearish candidates are shown at the Stage 1
+    shortlist (§4.7), narrowed to up to two per direction at Stage 2 (§4.8);
+    never padded at either stage; fewer than the maximum is an acceptable,
+    expected outcome.
+11. The system selects up to two bullish and up to two bearish final
+    candidates **independently** (§4.8, A-10/A-11) — there is no single
+    "best across both directions" pick. Each direction returns `NO_TRADE`/
+    `PARTIAL` independently with reasons (§5.7, §6) if nothing qualifies on
+    that side; it never forces a choice.
 12. Every bearish candidate is labeled `BEARISH_RESEARCH` by default, and only
     `BEARISH_EXECUTABLE_SHORT` when the three §5.6 conditions are all verified
     for that symbol/session — never inferred from the directional score alone.
@@ -619,17 +694,21 @@ Same input + same code version + same config reproduces the same result.
 
 - **Deterministic specification requirements (must hold before/during
   implementation, not hypotheses):** §3's canonical-bar and per-symbol
-  readiness rules; §4.1's four mandatory ranking gates and their exact
-  definitions; §5.3/§5.4's zone lifecycle rules (anchor/zone/touch/
-  confirmation/invalidation/expiry); §5.6's bearish-status conditions; §5.7's
-  reason codes; §8's persistence/reproducibility rules; no-look-ahead
-  throughout. These are correctness requirements, not things to validate by
-  backtesting — they are either implemented correctly or they are a defect.
+  readiness rules; §4.1-§4.4's scoring-dimension definitions, sub-score
+  formulas and tie-break order (the *formulas* are deterministic even though
+  their point values and the qualifying floor are hypotheses — see below);
+  §5.3/§5.4's zone lifecycle rules (anchor/zone/touch/confirmation/
+  invalidation/expiry); §5.6's bearish-status conditions; §5.7's reason codes;
+  §8's persistence/reproducibility rules; no-look-ahead throughout. These are
+  correctness requirements, not things to validate by backtesting — they are
+  either implemented correctly or they are a defect.
 - **Research hypotheses (provisional values, require backtest evidence before
   being treated as production-ready):** the net R:R minimum (§5.5), the
-  universe-coverage threshold (§6), which zone model/boundary variant wins
-  (§5.3-§5.4, decided by §7.5), and the session-reset-vs-rolling ATR question
-  (§5.2, §7.8).
+  universe-coverage threshold (§6), the Stage 1 qualifying floor and neutral
+  band (§4.4), the RS magnitude threshold (§4.1), the Stage 2 minimum
+  conditions and R:R soft floor (§4.8, pending ChatGPT confirmation), which
+  zone model/boundary variant wins (§5.3-§5.4, decided by §7.5), and the
+  session-reset-vs-rolling ATR question (§5.2, §7.8).
 - **Validation requirements (must be demonstrated via the §7 backtest before
   any hypothesis above is promoted to a production default):** the §7.5
   minimum-evidence bar (≥100 qualified setups per configuration); chronological
@@ -664,7 +743,9 @@ Same input + same code version + same config reproduces the same result.
 | Instrument scope | Cash equity + F&O (futures/options) | **Cash equity only** — derivatives removed entirely |
 | §4A readiness | Global common-watermark across 50 symbols; §4A.4 halt/zero-trade proof contract | **Per-symbol readiness**; bad symbol excluded with reason, others continue; global NOT READY only for genuine global failures |
 | Order blocks | Full §7.5-§7.8 lifecycle (nested OBs, mitigation states, additional liquidity subsystems) | **Fully deterministic minimal OB (§5.3)**: fixed 5-bar lookback, nearest-opposing-candle anchor rule, session-bound expiry, 4 states only — compared against a non-equivalent displacement-origin baseline (§5.4) under a defined minimum-evidence bar (§7.5); simpler (B) wins by default |
-| Ranking (§4) | Weighted multi-indicator score with an unvalidated cutoff | **Four mandatory pass/fail gates** (§4.1), no invented weighting scheme; rank by RS magnitude then displacement recency (§4.3) |
+| Ranking (§4) | Weighted multi-indicator score with an unvalidated cutoff | **Weighted score** (§4.1-§4.4): RS 30 + trend/momentum 30 + structure 30 (90 total), volume as tiebreak only, qualifying floor + neutral band — see §13.2 for the within-v0.3 history of this decision |
+| Final output | One best candidate across both directions, or NO TRADE (A-11) | **Up to 2 bullish + 2 bearish, decided independently** (A-10/A-11 superseded 2026-11-05, §4.8-§4.9) |
+| Stage 1 shortlist size | Up to 3 per direction | **Up to 5 per direction** (§4.7), narrowed to 2 at Stage 2 |
 | Historical data vs live provider | Conflated (Gate 0 covered both) | **Explicitly split** (§7.6): Gate 4 replay needs only a batch historical dataset; Gate 0 live-streaming is a separate, later dependency. Historical source availability flagged as a genuine unresolved blocker, not assumed |
 | R:R | Split instrument-type-aware gate (underlying vs. option, §7.10/§8/§9.3) | **One R:R computation**, cash price only |
 | Contract selection (§9) | Futures/options eligibility, Greeks, expired-option history | **Removed entirely** |
@@ -696,6 +777,28 @@ Same input + same code version + same config reproduces the same result.
   status (deterministic / hypothesis / validation / deferred), and DoD (new
   §12.1-§12.3), per the owner's request not to describe every hypothesis as if
   it must be proven before implementation.
+
+### 13.2 Further corrections within v0.3 (second revision, 2026-11-05)
+
+Following a joint ChatGPT/Claude discussion on a "50 → top 5+5 → 2+2"
+selection method (`comms/chatgpt`'s note, `comms/claude/030`'s response):
+
+- **§4 ranking replaced again:** the four-mandatory-pass/fail-gate design from
+  §13.1 is replaced by a **weighted score** (RS 30 + trend/momentum merged 30 +
+  structure 30 = 90, volume as tiebreak only). This is **not** a reversal under
+  pressure — on reflection, the gate design applied Stage-2-shaped binary logic
+  (appropriate for validating a setup right now) to a Stage-1 problem (ranking
+  50 stocks, which structurally needs an ordered scale). It also contradicted
+  this document's own Stage 2 philosophy of not rejecting a good candidate for
+  one rigid technicality. See §4.9 for the full reasoning.
+- **Final output changed from one best pick to independent 2+2** (A-10/A-11
+  superseded): up to two bullish and two bearish candidates, selected
+  independently per direction, narrowed from a Stage 1 shortlist of up to five
+  per direction (not three). Owner decision, 2026-11-05.
+- Stage 2's exact minimum-suitability conditions (Method B), the R:R soft
+  floor, the ATR-wide-stop flag and session-timing exclusion windows were
+  **discussed but deliberately not locked in this revision** — they await
+  ChatGPT's confirmation (§4.8).
 
 **No profitability claim is made by this document. All scoring weights,
 thresholds, the zone-model choice and the ATR-reset behaviour remain
