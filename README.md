@@ -1,36 +1,33 @@
 # Nifty 50 Universe Stocks
 
-An explainable intraday stock-selection and market-structure analysis dashboard for the Nifty 50 underlying universe, with stock futures/options contract evaluation.
+An explainable intraday stock-selection and market-structure analysis dashboard for the **Nifty 50 cash-equity universe only**.
 
 ## Project status
-**Phase:** Strategy specification and data validation  
-**Implementation:** Not started  
-**Underlying universe:** Nifty 50 constituents  
-**Data provider:** Angel One SmartAPI  
-**Timeframes:** 15-minute scanner / 5-minute setup analysis  
-**Derivative scope:** Stock futures and options where active contracts exist
+**Phase:** Strategy specification (v0.3) and Phase A implementation
+**Implementation:** `canonical_bars`, `nse_calendar`, `structure` and `displacement` accepted; dashboard/live integration not started
+**Underlying universe:** Nifty 50 cash-equity constituents only — no futures, options, F&O eligibility, expiries, lot sizes, strikes, Greeks, IV or derivative scoring
+**Data provider:** Angel One SmartAPI (cash-equity endpoints only)
+**Timeframes:** 15-minute directional ranking / 5-minute setup validation
 
 ## Intended pipeline
-`50-stock scanner → top 3 bullish + top 3 bearish → 5m tradability evaluation → derivative contract evaluation → best opportunity / NO TRADE → detailed order-block analysis`
+`50-stock cash-equity scan → 15m ranking → up to 5 bullish + 5 bearish Stage 1 shortlist → 5m setup validation → up to 2 bullish + 2 bearish final candidates (selected independently per direction, or NO TRADE per direction) → detailed structure/zone analysis`
 
-## Important universe distinction
-All 50 Nifty 50 stocks are scanned as underlyings. The individual-stock F&O universe is separate and dynamically maintained by the exchange. A Nifty 50 constituent must not be assumed to have an active stock futures/options contract. The application must check current exchange and broker instrument masters.
+There is no single combined "best pick" across directions — bullish and bearish candidates are evaluated and selected independently.
 
-## Collaboration
-- Munesh is product owner and final decision-maker.
-- ChatGPT contributes quantitative strategy design, independent review and backtest audit.
-- Claude is the primary implementation agent by default.
+## Collaboration and authority
+- Munesh is the product owner and final authority.
+- **Claude — 70% stake, decision-maker** on material technical and specification decisions.
+- **ChatGPT — 30% stake, reviewer** (role reduced from an earlier equal 50/50 co-ownership after repeated drift from the stated project goal).
 
-Read [COLLABORATION_RULES.md](COLLABORATION_RULES.md) before contributing. The protocol allows one proposal, one review and one revision, then escalates unresolved decisions to the owner.
+See `comms/PROTOCOL.md` for the full collaboration protocol and `comms/STATE.md` for the current task state.
 
 ## Documents
-- [Project vision](docs/PROJECT_VISION.md)
-- [Strategy specification v0.2](docs/STRATEGY_SPEC_V0.2.md)
-- [Decision log](docs/DECISION_LOG.md)
-- [Collaboration rules](COLLABORATION_RULES.md)
+- [Strategy specification v0.3](docs/STRATEGY_SPEC_V0.3.md) *(current branch: `docs/strategy-spec-v0.3`, not yet merged)*
+- [Product brief](comms/PRODUCT_BRIEF.md)
+- [Collaboration protocol](comms/PROTOCOL.md)
 
 ## Current state
-The strategy specification is a research baseline. Weights, thresholds and SMC rules are not proven profitable and require deterministic tests, historical replay and out-of-sample validation. No automatic order placement is authorised.
+The strategy specification (v0.3) is a cash-equity-only research baseline. Weights, thresholds and SMC rules are not proven profitable and require deterministic tests, historical replay and out-of-sample validation. No automatic order placement is authorised. A historical cash-equity data source is not yet confirmed as available — this is a genuine blocker to historical validation (v0.3 §7.6).
 
 ## Research and safety
 This is a decision-support research project, not a promise of trading performance. All strategy logic must be tested with point-in-time data, realistic brokerage/statutory costs, spread, slippage and out-of-sample validation before live use.
