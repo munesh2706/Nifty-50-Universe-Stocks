@@ -603,17 +603,22 @@ separating what each actually needs.**
   streaming, reconnect handling, per-symbol gap recovery — which is a
   *separate* dependency needed for Gate 5 (paper observation) and any future
   live operation, not for Gate 4's offline replay.
-- **Genuine blocker, stated plainly, not invented away:** as of this
-  specification, **no historical cash-equity data source has been confirmed
-  as available with sufficient Nifty 50 coverage and depth.** It is not yet
-  established whether Angel One SmartAPI's historical REST endpoint alone
-  (used in a batch/offline mode, without a live streaming session) provides
-  enough 5m/15m history and point-in-time constituent coverage for the §7.5
-  comparison, nor has an alternative source been identified or approved. This
-  blocks Gate 4 from starting. **Minimum action required:** confirm (a)
-  SmartAPI's historical-endpoint coverage and retention for the current 50
-  symbols via a small, bounded test pull, or (b) an alternative, approved
-  historical data source. No source is assumed or invented by this document.
+- **Source decided, depth/coverage still unverified (owner decision,
+  2026-11-05): Angel One SmartAPI is the designated historical data source.**
+  This resolves the "which source" half of the earlier blocker — no
+  alternative source is being evaluated. **It does not yet resolve the
+  "is it sufficient" half:** whether SmartAPI's historical REST endpoint
+  (used in a batch/offline mode, without a live streaming session) actually
+  provides enough 5m/15m history, retention and point-in-time constituent
+  coverage for the §7.5 minimum-evidence bar is still **empirically
+  unconfirmed** — stating the source does not by itself prove the depth
+  exists. **Remaining minimum action (Gate 0, Phase B — requires credentials
+  and a separate explicit joint activation, not performed by this
+  revision):** run the bounded test pull against SmartAPI's historical
+  endpoint for the current 50 symbols and the Nifty benchmark, and record the
+  actual coverage/retention/gap results. Gate 4 (§9) remains blocked until
+  that result is in — not because the source is unknown anymore, but because
+  its sufficiency is not yet measured.
 - **Data-quality handling once a source exists:** missing/invalid candles are
   excluded per-symbol (§3.2), never fabricated. Corporate actions (splits,
   bonuses, dividends) require a price-continuity adjustment; the source for
@@ -701,9 +706,11 @@ Same input + same code version + same config reproduces the same result.
   measurable result **before** dashboard expansion or Gate 0's live-streaming
   integration proceeds. This ordering is itself a decision: establish whether
   the strategy has an edge before building more surface area around it. **Gate
-  4 is currently blocked on the historical-data source question in §7.6** —
-  that must be resolved before this gate can start; it does not require Gate
-  0's live-streaming work to be resolved first (§7.6 explains the split).
+  4 is currently blocked on the §7.6 depth/coverage confirmation** — the
+  source is now designated (Angel One SmartAPI, owner decision 2026-11-05),
+  but its sufficiency for the current 50 symbols is still unverified; it does
+  not require Gate 0's live-streaming work to be resolved first (§7.6
+  explains the split).
 - **Gate 5 — Paper observation:** live shadow signals, no order placement,
   compared against replay expectations.
 - **Gate 6 — Live execution:** out of scope for this project entirely (unchanged
@@ -985,6 +992,18 @@ in `comms/STATE.md`.
 **This closes the v0.3 specification review cycle. Both the 70% decision-maker
 and the 30% reviewer have converged with no unresolved disputes; v0.3 is the
 strategy baseline for the next authorized project phase.**
+
+### 13.5 Historical data source designated (owner decision, 2026-11-05)
+
+**Angel One SmartAPI is the designated historical cash-equity data source**,
+resolving the "which source" half of §7.6's blocker. The "is it sufficient"
+half remains open: actual 5m/15m coverage, retention and point-in-time
+constituent history for the current 50 symbols have not yet been measured.
+Gate 4 (§9) stays blocked until a Gate 0 bounded test pull against SmartAPI's
+historical endpoint confirms sufficiency — this is Phase B work requiring
+credentials and a separate explicit joint activation, not performed by this
+document or this revision. No alternative source is being evaluated unless
+this one proves insufficient.
 
 **No profitability claim is made by this document. All scoring weights,
 thresholds, the zone-model choice and the ATR-reset behaviour remain
