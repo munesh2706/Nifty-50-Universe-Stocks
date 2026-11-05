@@ -37,10 +37,13 @@ try:
 except ImportError:  # pragma: no cover
     pyotp = None  # type: ignore[assignment]
 
+_DOTENV_LOADED = False
+_DOTENV_PATH: str | None = None
 try:
-    from dotenv import load_dotenv
+    from dotenv import find_dotenv, load_dotenv
 
-    load_dotenv()  # reads .env into the process environment, if present
+    _DOTENV_PATH = find_dotenv(usecwd=True) or None
+    _DOTENV_LOADED = load_dotenv(override=False)
 except ImportError:  # pragma: no cover - only needed when actually run
     pass
 
@@ -212,10 +215,30 @@ def _selftest() -> None:  # pragma: no cover - manual, run by the owner only
     print(f"Fetched {len(candles)} candles. First: {candles[0] if candles else 'none'}")
 
 
+def _diagnose() -> None:  # pragma: no cover - manual, safe (no secret values printed)
+    """Report presence/length only, never real values. Safe for Claude to run."""
+    print(f"dotenv package available: {_DOTENV_PATH is not None or _DOTENV_LOADED or 'dotenv' in globals()}")
+    print(f".env file found at: {_DOTENV_PATH or '(not found by find_dotenv)'}")
+    print(f"load_dotenv() reported it loaded a file: {_DOTENV_LOADED}")
+    print(f"current working directory: {os.getcwd()}")
+    for field, names in SmartAPICredentials._ENV_NAMES.items():
+        found_name = None
+        length = 0
+        for name in names:
+            raw = os.environ.get(name, "")
+            if raw.strip().strip('"').strip():
+                found_name = name
+                length = len(raw.strip().strip('"').strip())
+                break
+        print(f"{field}: {'SET via ' + found_name + f' (len={length})' if found_name else 'NOT SET / empty'}")
+
+
 if __name__ == "__main__":  # pragma: no cover
     import sys
 
     if "--selftest" in sys.argv:
         _selftest()
+    elif "--diagnose" in sys.argv:
+        _diagnose()
     else:
         print(__doc__)
