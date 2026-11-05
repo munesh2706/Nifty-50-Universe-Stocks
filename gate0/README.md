@@ -12,11 +12,17 @@ decision (spec §14).
 - **Phase A (current, authorized):** repository-only, pure logic, synthetic
   fixtures. **No** SmartAPI login, REST, WebSocket, instrument-master download,
   credentials, or real market data. Everything here is offline and unit-tested.
-- **Phase B (NOT authorized):** real SmartAPI calls and data collection, only
-  after a separate explicit joint co-owner activation timed to a live NSE
-  session, under Gate 0 v1.1 (throttle ≤3 req/s·180/min, secret handling, audit
-  evidence, fail-closed acceptance). `providers/smartapi_stub.py` refuses to run
-  until then.
+- **Phase B (not executed by Claude):** real SmartAPI calls and data
+  collection, under Gate 0 v1.1 (throttle ≤3 req/s·180/min, secret handling,
+  audit evidence, fail-closed acceptance). `providers/smartapi_stub.py` is the
+  inert interface placeholder and refuses to run unconditionally.
+  `providers/smartapi_client.py` (2026-11-05) is the real implementation —
+  reads real credentials from `.env` at runtime per `.env.example` — written
+  so the **owner runs it themselves** (`python -m gate0.providers.smartapi_client
+  --selftest`, after `pip install -r requirements-phase-b.txt`). Claude does
+  not execute this against the live API, read the real credential values, or
+  run any command that would authenticate with the live account — see
+  `comms/PROTOCOL.md`.
 
 ## Layout
 
