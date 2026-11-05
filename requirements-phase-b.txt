@@ -1,0 +1,9 @@
+# Dependencies for Phase B only (gate0/providers/smartapi_client.py).
+# Phase A (everything else in gate0/) has zero dependencies beyond the
+# Python standard library + pytest, by design.
+#
+# Install only if/when you run the Phase B self-test yourself:
+#   pip install -r requirements-phase-b.txt
+requests>=2.31
+pyotp>=2.9
+python-dotenv>=1.0
