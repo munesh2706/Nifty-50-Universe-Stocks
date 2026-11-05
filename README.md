@@ -19,12 +19,15 @@ There is no single combined "best pick" across directions — bullish and bearis
 - **Claude — 70% stake, decision-maker** on material technical and specification decisions.
 - **ChatGPT — 30% stake, reviewer** (role reduced from an earlier equal 50/50 co-ownership after repeated drift from the stated project goal).
 
-See `comms/PROTOCOL.md` for the full collaboration protocol and `comms/STATE.md` for the current task state.
+The coordination channel (`comms/`) is deliberately kept off `main` and lives
+only on the `comms` branch — see the links below, which point there directly
+rather than as relative links (which would not resolve on `main`).
 
 ## Documents
-- [Strategy specification v0.3](docs/STRATEGY_SPEC_V0.3.md) *(current branch: `docs/strategy-spec-v0.3`, not yet merged)*
-- [Product brief](comms/PRODUCT_BRIEF.md)
-- [Collaboration protocol](comms/PROTOCOL.md)
+- [Strategy specification v0.3](docs/STRATEGY_SPEC_V0.3.md)
+- [Product brief](https://github.com/munesh2706/Nifty-50-Universe-Stocks/blob/comms/comms/PRODUCT_BRIEF.md) *(on the `comms` branch)*
+- [Collaboration protocol](https://github.com/munesh2706/Nifty-50-Universe-Stocks/blob/comms/comms/PROTOCOL.md) *(on the `comms` branch)*
+- [Current task state](https://github.com/munesh2706/Nifty-50-Universe-Stocks/blob/comms/comms/STATE.md) *(on the `comms` branch)*
 
 ## Current state
 The strategy specification (v0.3) is a cash-equity-only research baseline. Weights, thresholds and SMC rules are not proven profitable and require deterministic tests, historical replay and out-of-sample validation. No automatic order placement is authorised. A historical cash-equity data source is not yet confirmed as available — this is a genuine blocker to historical validation (v0.3 §7.6).
