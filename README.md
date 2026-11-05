@@ -4,7 +4,8 @@ An explainable intraday stock-selection and market-structure analysis dashboard 
 
 ## Project status
 **Phase:** Strategy specification (v0.3) and Phase A implementation
-**Implementation:** `canonical_bars`, `nse_calendar`, `structure` and `displacement` accepted; dashboard/live integration not started
+**Implementation:** `canonical_bars`, `nse_calendar`, `structure`, `displacement` and the Stage 1 directional **ranking** module (`gate0/ranking.py`, `gate0/indicators.py`) accepted; Stage 2 setup module, dashboard and live integration not started
+**Data evidence:** Angel One SmartAPI's historical endpoint confirmed working against the owner's real account — 49/50 constituents + the Nifty 50 index show clean, consistent 5m/15m coverage across a 90-day window (~59 trading sessions; v0.3 §13.6-§13.7)
 **Underlying universe:** Nifty 50 cash-equity constituents only — no futures, options, F&O eligibility, expiries, lot sizes, strikes, Greeks, IV or derivative scoring
 **Data provider:** Angel One SmartAPI (cash-equity endpoints only)
 **Timeframes:** 15-minute directional ranking / 5-minute setup validation
