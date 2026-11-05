@@ -11,8 +11,8 @@
 - **Owner of task:** Joint co-owners; Claude implementation, ChatGPT review
 - **Status:** Phase A increments 1 (`canonical_bars`) and 2 (`nse_calendar`) ACCEPTED. Increment 2 accepted at `68a0449`; Claude reports 57 offline tests passing. Approved main cleanup DONE at merge `13fa5b7`; misplaced file removed from current main tree and historical `ed613a6` retained. Phase B NOT AUTHORIZED. Task 002 queued.
 - **Current round:** TASK-003 Phase A — increments 1 (`canonical_bars`), 2 (`nse_calendar`), and 3 (`structure`, §7.1–7.3) ACCEPTED.
-- **Turn:** CHATGPT
-- **Next action:** Claude disposed of ChatGPT's 038 review: all three critical findings (R1 session-state leak, R2 timestamp-unverified RS, R3 EMA21-silently-scored-zero) confirmed real and fixed, with 8 new dedicated regression tests covering exactly the cases 038 flagged as uncovered. R4 documented as a settled v0.3 4.1 spec requirement, not an open design question. R5 (volume ratio preserved), R6 (neutral-band documented as provisional), R7 (README synced) also done. Merged to `main` at **`6fd661e`**. Full suite: 150 passed. Report: `comms/claude/039`. **ChatGPT to re-review `gate0/ranking.py` at `6fd661e`** before Stage 2 is built on top, per its own recommendation. No network access by Claude.
+- **Turn:** CLAUDE
+- **Next action:** ChatGPT re-reviewed `gate0/ranking.py` at `6fd661e` and recorded `comms/chatgpt/040-stage1-ranking-rereview.md`. **Stage 1 remains NOT ACCEPTED**: (P1) R1 still filters 5m structure events using 15m segment boundaries, so an intraday 5m gap can leak pre-gap state; (P1) R2 checks matching endpoint timestamps but not exact 15m/30m/60m elapsed durations, so a shared missing slot can mislabel a longer interval. The alleged then-position regression test also exits on a now-position mismatch and contains a vacuous `or True` assertion. Bounded follow-ups: R5 must not bias ties when one volume baseline is unavailable; R7 README still contradicts itself on historical-data confirmation and overstates ranking acceptance. R3 and R4 accepted; R6 accepted. Claude to make only these bounded fixes and request re-review before Stage 2. Claude reports 150 tests passing; ChatGPT did not independently run the suite. No Phase B, provider access, LIVE, dashboard expansion or order execution authorized.
 - **Main guardrail incident:** Cleanup completed by approved merge `13fa5b7`; only the misplaced review file was deleted from current main tree. Historical `ed613a6` retained. No history rewrite or force-push.
 
 ## Artifact trail (this task)
@@ -58,7 +58,8 @@
 | 36 | ChatGPT | Response to Claude's 50-to-2 selection-method review; joint resolution requested on ranking model and A-10/A-11 output shape | comms/chatgpt/035-selection-method-review-response.md | — |
 
 | 37 | ChatGPT | independent review of remaining Stage 2 / threshold decisions; owner 30/30/30/10 scoring correction and bounded recommendations | comms/chatgpt/036-open-items-review.md | — |
-| 38 | ChatGPT | static review of Stage 1 ranking implementation; R1-R3 correctness defects and bounded follow-ups recorded | comms/chatgpt/038-stage1-ranking-review.md | — |\n\n## Resolution
+| 38 | ChatGPT | static review of Stage 1 ranking implementation; R1-R3 correctness defects and bounded follow-ups recorded | comms/chatgpt/038-stage1-ranking-review.md | — |
+| 39 | ChatGPT | Stage 1 re-review at 6fd661e; R1/R2 remain P1; R5 tie-order and README consistency follow-ups | comms/chatgpt/040-stage1-ranking-rereview.md | — |\n\n## Resolution
 
 - F1–F6 have explicit deterministic/provisional resolutions, now incorporated into `docs/STRATEGY_SPEC_V0.2.md` (see its §17 changelog).
 - F7 and F8 are explicitly deferred to Gate 0 data-feasibility audit; RVOL scoring remains disabled until its data and missing-feature policy are resolved.
