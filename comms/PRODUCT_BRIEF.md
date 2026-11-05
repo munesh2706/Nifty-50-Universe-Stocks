@@ -57,16 +57,15 @@ Indicator presence must not be confused with a validated trading edge. Each indi
 - Show top 3 bullish and top 3 bearish candidates.
 - Evaluate those candidates and identify the best tradable stock, or NO TRADE.
 - Clicking the tradable stock opens detailed chart/technical analysis.
-- Discuss order blocks, EMA, Supertrend and VWAP with Claude before locking detailed behaviour.
+- Discuss order blocks, EMA and VWAP with Claude before locking detailed behaviour. (Historical record of the original owner request; Supertrend was never adopted and is explicitly excluded from the v0.3 feature set — see §9.)
 
 ### Open for Claude/ChatGPT proposal and owner approval where needed
 
 - Frontend/backend framework, database and deployment.
 - Exact dashboard layout and event-stream transport.
 - EMA periods and whether EMA is used for ranking, confirmation or display only.
-- Supertrend parameters and its role in the decision pipeline.
 - VWAP rules and its role in the decision pipeline.
-- Deterministic order-block/BOS/CHoCH definitions and entry rules.
+- Deterministic BOS/CHoCH definitions (resolved — `structure.py`, accepted) and zone-model entry rules (resolved — v0.3 §5.3/§5.4).
 - Score weights, hard gates, session controls and risk limits.
 - Exact quote refresh/freshness expectations based on SmartAPI capabilities.
 
