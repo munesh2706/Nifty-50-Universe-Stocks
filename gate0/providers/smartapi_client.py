@@ -37,6 +37,13 @@ try:
 except ImportError:  # pragma: no cover
     pyotp = None  # type: ignore[assignment]
 
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()  # reads .env into the process environment, if present
+except ImportError:  # pragma: no cover - only needed when actually run
+    pass
+
 BASE_URL = "https://apiconnect.angelbroking.com"
 LOGIN_PATH = "/rest/auth/angelbroking/user/v1/loginByPassword"
 CANDLE_PATH = "/rest/secure/angelbroking/historical/v1/getCandleData"
@@ -61,27 +68,37 @@ class SmartAPICredentials:
     password_or_pin: str
     totp_secret: str
 
+    # Accepts either naming scheme; ANGEL_* is primary (matches .env.example).
+    _ENV_NAMES = {
+        "api_key": ("ANGEL_API_KEY", "SMARTAPI_API_KEY"),
+        "client_code": ("ANGEL_CLIENT_CODE", "SMARTAPI_CLIENT_CODE"),
+        "password_or_pin": ("ANGEL_PASSWORD", "SMARTAPI_PASSWORD_OR_PIN"),
+        "totp_secret": ("ANGEL_TOTP_SECRET", "SMARTAPI_TOTP_SECRET"),
+    }
+
     @classmethod
     def from_env(cls) -> "SmartAPICredentials":
         """Read credentials from the environment. Never hardcode real values."""
-        required = {
-            "SMARTAPI_API_KEY": os.environ.get("SMARTAPI_API_KEY", ""),
-            "SMARTAPI_CLIENT_CODE": os.environ.get("SMARTAPI_CLIENT_CODE", ""),
-            "SMARTAPI_PASSWORD_OR_PIN": os.environ.get("SMARTAPI_PASSWORD_OR_PIN", ""),
-            "SMARTAPI_TOTP_SECRET": os.environ.get("SMARTAPI_TOTP_SECRET", ""),
-        }
-        missing = [k for k, v in required.items() if not v]
+        values: dict[str, str] = {}
+        missing: list[str] = []
+        for field, names in cls._ENV_NAMES.items():
+            value = ""
+            for name in names:
+                # .strip() guards against a stray trailing space/quote in .env,
+                # e.g. `ANGEL_API_KEY= "abc123"` or a line with no real value yet.
+                raw = os.environ.get(name, "").strip().strip('"').strip()
+                if raw:
+                    value = raw
+                    break
+            if not value:
+                missing.append("/".join(names))
+            values[field] = value
         if missing:
             raise SmartAPICredentialsError(
-                f"Missing required environment variable(s): {', '.join(missing)}. "
-                f"Copy .env.example to .env and fill in your real SmartAPI values."
+                f"Missing or empty required environment variable(s): {', '.join(missing)}. "
+                f"Check .env has real (non-empty) values with no stray quotes."
             )
-        return cls(
-            api_key=required["SMARTAPI_API_KEY"],
-            client_code=required["SMARTAPI_CLIENT_CODE"],
-            password_or_pin=required["SMARTAPI_PASSWORD_OR_PIN"],
-            totp_secret=required["SMARTAPI_TOTP_SECRET"],
-        )
+        return cls(**values)
 
 
 class SmartAPIClient:
