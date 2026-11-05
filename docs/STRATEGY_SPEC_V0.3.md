@@ -1005,6 +1005,36 @@ credentials and a separate explicit joint activation, not performed by this
 document or this revision. No alternative source is being evaluated unless
 this one proves insufficient.
 
+### 13.6 First real Gate 0 evidence: 20-day coverage audit (owner-run, 2026-11-05)
+
+The owner ran the Gate 0 bounded audit themselves
+(`gate0/providers/historical_audit.py`, `--days 20`) against their own real
+SmartAPI account. Results (`candle-coverage.csv`, not committed — contains no
+secrets but is run-specific output):
+
+- **49 of 50 current constituents + the Nifty 50 index**: clean, consistent
+  5m **and** 15m coverage — 950 5m bars / 325 15m bars each, spanning
+  2026-10-19 → 2026-11-05 (~13 trading sessions within the 20 calendar-day
+  window). Both timeframes validated with zero issues via the already-
+  accepted `canonical_bars.validate_series`.
+- **TATAMOTORS**: instrument-master token unresolved — a reference-data gap
+  (likely related to Tata Motors' commercial-vehicles demerger changing its
+  listing), not a SmartAPI data-availability problem. Needs a one-off fix to
+  `gate0/nifty50_constituents.py`/`instrument_master.py`, not a design change.
+- **TCS 15m**: one request returned an empty/unparseable response
+  (`Expecting value: line 1 column 1`) while its own 5m request succeeded —
+  treated as a transient API hiccup pending a retry, not recorded as a
+  confirmed gap.
+
+**What this proves:** SmartAPI's historical endpoint reliably serves recent
+(20-day) 5m/15m coverage for essentially the whole Nifty 50 universe — a real,
+positive, first-hand result (not assumed). **What this does not yet prove:**
+sufficient *depth* for the §7.5 backtest's 100-qualified-setups-per-
+configuration bar, which likely needs several months of history, not 20 days.
+**Gate 4 remains blocked** pending a longer-window retention check (e.g.,
+60/90/180+ days) — the natural next Gate 0 step, same script, larger
+`--days` value, run by the owner.
+
 **No profitability claim is made by this document. All scoring weights,
 thresholds, the zone-model choice and the ATR-reset behaviour remain
 hypotheses until independently validated by the §7.5 comparisons.**
