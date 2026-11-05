@@ -54,10 +54,14 @@ scanner's output is tied to a tradable derivative contract.
 2. Ingest and validate completed 15m and 5m candles **per symbol, independently**.
 3. Compute 15m directional features and rank eligible symbols (§4).
 4. Show up to five bullish and five bearish candidates at the Stage 1 shortlist (§4.7); never pad.
-5. Evaluate those six on completed 5m candles for structure, displacement,
-   setup quality, entry freshness, invalidation and net reward/risk (§5).
-6. Select the single best qualified candidate across both directions, or
-   return NO TRADE with reasons; label the result by universe coverage (§6).
+5. Evaluate the Stage 1 shortlist (up to ten names total, up to five per
+   direction) on completed 5m candles for structure, displacement, setup
+   quality, entry freshness, invalidation and net reward/risk (§5).
+6. Select up to **two bullish and two bearish final candidates,
+   independently per direction** (§4.8-§4.9), or return `NO_TRADE`
+   independently for either or both directions with reasons; label the
+   result by universe coverage (§6). There is no single "best across both
+   directions" pick.
 7. On selection, open the detail view: candles, structure (swings, BOS/CHoCH),
    displacement, the pullback zone (or order block, per the comparison in §5.4),
    entry, invalidation, stop, target, and the score/reason breakdown.
@@ -97,8 +101,9 @@ Replaced by:
 - **Backfill/warm-up is per symbol.** Each symbol's own history and indicator/
   structure state must be reconciled and warmed up before it contributes a
   signal; there is no requirement for every symbol to share one watermark.
-- **Coverage is shown, not hidden.** The scanner displays `N/50 healthy` and
-  distinguishes a universe-wide best pick from a partial-universe result (§6).
+- **Coverage is shown, not hidden.** The scanner displays `N/50 healthy` and,
+  per direction, distinguishes a universe-wide result from a PARTIAL result
+  (§6) — there is no single combined "best pick."
 
 This section replaces v0.2 §4A and §4A.4-§4A.5 in full. The NSE calendar
 module (`gate0/nse_calendar.py`) is reused unchanged for session/holiday logic
@@ -120,7 +125,10 @@ timestamps), award **10 points** if the sign agrees with the candidate's
 direction **and** the absolute difference is at or above a configurable
 minimum-meaningful threshold (provisional default **0.15%**, a hypothesis to
 calibrate, not locked); otherwise **0** for that interval. Sum across the
-three intervals (max 30).
+three intervals (max 30). **Sensitivity to be tested in backtest (§7.7):**
+report how the 0.15% threshold and the binary 10/0 per-interval scoring
+(rather than a continuous RS-to-points mapping) affect shortlist composition
+and tie frequency, before treating either as final.
 
 **Trend and momentum, merged (0-30):** resolves the double-counting flagged
 in the joint discussion (`comms/claude/030`) by giving the two sub-signals
@@ -129,13 +137,23 @@ genuinely distinct definitions instead of two labels for the same thing:
   agrees with the direction **and** the last completed-15m close is on the
   correct side of session VWAP (both must hold); otherwise 0. No partial
   credit within this half.
-- **Momentum sub-score (0-15):** compares the price change over the most
-  recent 3 completed 15m bars against the prior 3 completed 15m bars (is the
-  move accelerating or decelerating) — genuinely different information from
-  Trend, which only measures position/direction, not rate of change. Award
-  **15** if accelerating in the candidate direction, **8** if moving in the
-  candidate direction but decelerating, **0** if moving against the candidate
-  direction.
+- **Momentum sub-score (0-15), precise formula (tightened 2026-11-05):** let
+  `recent = close[t] - close[t-3]` (latest 3 completed 15m bars) and
+  `prior = close[t-3] - close[t-6]` (the 3 bars before that), both signed in
+  price units. Classify by sign and relative magnitude:
+  - **0** if `recent`'s sign disagrees with the candidate direction (moving
+    against it), regardless of `prior`.
+  - **15** if `recent` agrees with the direction **and** `|recent| > |prior|`
+    (genuinely accelerating).
+  - **8** if `recent` agrees with the direction but `|recent| <= |prior|`
+    (still trending, decelerating or flat pace).
+  This is a ratio of magnitudes, not an absolute threshold, so it is scale-
+  invariant across symbols with different price levels/volatility — no
+  separate normalization step is needed. **Sensitivity to be tested in
+  backtest (§7.7):** the 3-bar/3-bar window and the three-bucket discretization
+  (rather than a continuous score) are provisional choices; report how many
+  ties they produce in practice and whether a different window changes
+  outcomes materially.
 
 **Market structure (0-30):**
 - **State sub-score (0-15):** 15 if `structure.py`'s current state for the
@@ -179,10 +197,22 @@ scored with partial data. This is distinct from the optional volume modifier
   descending; ties broken by the volume modifier (§4.2) where available, then
   alphabetically by ticker for display stability only (no selection
   significance).
-- **A symbol may appear on both lists only if both direction-scores clear the
-  floor and differ by at least a configurable neutral band** (score points,
-  not price) — otherwise it is directionally unclear and excluded from both
-  lists. (Retained from the prior revision's reasoning; value to calibrate.)
+- **Neutral-band resolution (corrected 2026-11-05 — the prior revision had this
+  backward; see §13.3).** A symbol does **not** ordinarily appear on both
+  lists in one scan. Compute both the bullish and bearish total scores
+  (0-90) for every symbol:
+  - If only one direction's score clears the floor (§4.4 above), the symbol
+    is eligible in that direction only.
+  - If **both** clear the floor and the absolute difference between them is
+    **below** a configurable neutral band (score points, not price), the
+    symbol is **directionally ambiguous** — genuinely showing both strong
+    bullish and bearish characteristics at once — and is excluded from
+    **both** lists.
+  - If **both** clear the floor and the difference is **at or above** the
+    neutral band, the symbol is assigned to the **stronger direction only**;
+    the weaker side is dropped, not shown.
+  The neutral-band value is provisional and to be calibrated from backtest
+  results (§7), not fixed here.
 
 ### 4.5 Explanation to the user
 
@@ -197,7 +227,17 @@ rejection is as explainable as the selection.
 - Symbol readiness per §3.2 (not `UNAVAILABLE`).
 - Indicator/structure warm-up satisfied (§5.1-§5.2 warm-up requirements).
 - Minimum liquidity / acceptable spread proxy.
-- No exchange/broker trading restriction making execution impractical.
+
+**Correction, 2026-11-05 (see §13.3):** a trading/short-sale restriction is
+**not** a Stage 1 ranking gate. Directional suitability (is this symbol among
+the strongest bullish/bearish candidates?) and execution suitability (can the
+proposed action actually be taken under broker/exchange restrictions, same-day
+square-off and liquidity?) are two separate questions. A bearish symbol with
+genuinely strong bearish characteristics must still rank and appear as a
+`BEARISH_RESEARCH` candidate even if short-selling is currently restricted for
+it — restriction only ever affects promotion to `BEARISH_EXECUTABLE_SHORT`
+(§5.6), never Stage 1 eligibility or score. (This also resolves the prior
+revision's direct conflict between this section and §5.6.)
 
 ### 4.7 Stage 1 shortlist
 
@@ -206,25 +246,36 @@ score. Show fewer if fewer clear the floor; never pad with weak names. This
 Stage 1 shortlist is **not** the final output — it feeds Stage 2 (§5) for
 setup validation.
 
-### 4.8 Stage 2 narrowing and final candidates — pending confirmation
+### 4.8 Stage 2 narrowing and final candidates (locked, 2026-11-05)
 
 **(Owner decision, 2026-11-05: the final output is up to two bullish and two
 bearish candidates, selected independently — no single "best across both
-directions" pick; see §4.9 and A-10/A-11.)** The exact Stage 2 (5m)
-minimum-suitability conditions and ranking method that narrow the five-per-
-side shortlist down to two per side are proposed in the joint discussion
-(`comms/claude/030-selection-method-discussion-response.md`, "Method B":
-qualitative minimum conditions, then rank survivors by setup quality) but are
-**not yet locked into this specification** — per the owner's "rest check with
-ChatGPT" instruction (2026-11-05), the precise Stage 2 conditions (the 5m/15m
-agreement check, the pullback/entry condition, the invalidation-level
-condition, and the proposed ~1:1 soft reward:risk floor) await ChatGPT's
-confirmation before being written here as settled rules. Until then, §5's
-existing zone-model mechanics (§5.3/§5.4) remain the implemented basis for
-Stage 2 entry/invalidation; only the *selection method on top of them*
-(Method B vs. a pure weighted top-2) is still open.
+directions" pick; see §4.9 and A-10/A-11.)**
 
-If both directions' Stage 2 evaluation yields no qualifying candidate, that
+Following ChatGPT's review input on the open Method-B question, Stage 2's
+**selection layer** is now locked to three practical questions, applied to
+each Stage 1 candidate (up to five per direction) **on top of** the already-
+owner-ruled zone mechanics in §5.3/§5.4 (those mechanics are not reopened by
+this — see §13.3 on why the dual zone-model comparison is retained):
+
+1. **Directional confirmation:** does completed 5m price action support the
+   15m directional thesis (consistent with the symbol's `structure.py` state
+   and the zone model's direction, §5.1-§5.4)?
+2. **Reachable entry:** is the entry at or near current price, or via a
+   realistically reachable pullback into the active zone (§5.3/§5.4's touch/
+   confirmation) — not a move that has already run away?
+3. **Defensible stop and target:** is there a logical nearby invalidation
+   level (the zone's distal boundary, §5.3/§5.4) and a realistic target
+   (§5.5) with reward:risk shown after estimated costs?
+
+A candidate failing any of the three is not eligible at Stage 2, regardless of
+its Stage 1 score. Eligible survivors are ranked by setup quality (net R:R,
+freshness of confirmation, and the Stage 1 score as a tie-break) and the top
+two per direction are the final candidates. **The precise numeric floor for
+question 3's reward:risk (e.g., a soft ~1:1 minimum) remains open** and is
+not locked by this revision — see §11.
+
+If a direction's Stage 2 evaluation yields no qualifying candidate, that
 direction independently returns `NO_TRADE` (§5.7) — a directional shortlist
 existing at Stage 1 does not guarantee a Stage 2 result; a directional edge is
 necessary but not sufficient, per A-04.
@@ -432,17 +483,21 @@ NO TRADE carries one or more of these with a human-readable explanation.
 ## 6. Universe coverage and the final decision
 
 - The scanner always shows **N/50 healthy** (§3.2) alongside the shortlist.
-- A **universe-wide best pick** (the system's strongest claim) requires
-  coverage at or above a configurable minimum threshold.
+- A **universe-wide result** for a given direction (the system's strongest
+  claim for that side — its up-to-2 final candidates, §4.8) requires coverage
+  at or above a configurable minimum threshold. Each direction is judged
+  against this threshold independently; one direction can be universe-wide
+  while the other is partial.
 - **No threshold is fixed by this specification.** v0.2-era discussion proposed
   35/50 as a provisional default; this is **not locked** — the real value must
   come from observed feed-reliability evidence once Gate 0 (cash-equity scope,
   §9) runs, not from an assumption made now.
-- Below the threshold, the system may still show a shortlist and a best
-  candidate among the *available* symbols, but the result is explicitly
-  labeled **PARTIAL** — distinct from a full universe-wide NO TRADE (which
-  means "all 50 evaluated, none qualified"). These two outcomes must never be
-  visually or textually conflated.
+- Below the threshold for a direction, that direction's candidates may still
+  be shown among the *available* symbols, but the result is explicitly
+  labeled **PARTIAL** for that direction — distinct from that direction's
+  `NO_TRADE` (which means "all eligible symbols on that side were evaluated,
+  none qualified"). These two outcomes must never be visually or textually
+  conflated, and must never be described as a single "best pick."
 
 ## 7. Backtesting and validation
 
@@ -568,13 +623,30 @@ separating what each actually needs.**
   real-time per-symbol readiness monitoring, live bar construction, and Gate 5
   paper observation. None of these are needed to answer the §7.5 question.
 
-### 7.7 Standard metrics
+### 7.7 Standard metrics and full-pipeline validation (strengthened 2026-11-05)
 
-Win rate, profit factor, performance by direction, by regime, and by
-time-of-day bucket. Chronological train/holdout split; no tuning on the final
-holdout. Report sample size, dates, and known limitations. Never declare
-success on win rate alone; no numeric pass/fail threshold is pre-approved — it
-is set only after observing real results with real costs.
+**§7.5's A/B/boundary comparison answers only "which zone model is better" —
+it does not by itself establish that the complete 50→5+5→2+2 selection
+pipeline is useful.** That is a separate, necessary question and must be
+reported as its own result, not inferred from the zone comparison:
+
+- Does the Stage 1 weighted ranking (§4.1-§4.4) add value over a simple
+  baseline (e.g., raw relative strength alone, or a random draw from symbols
+  passing the eligibility gates)? Report both, side by side.
+- Performance of the **final bullish candidates and final bearish candidates,
+  evaluated independently** (not pooled) — consistent with §4.8's independent-
+  per-direction design.
+- Win rate, profit factor, performance by direction, by regime, and by
+  time-of-day bucket.
+- Chronological train/holdout split, with the reported uncertainty around the
+  holdout result (not a point estimate presented as certain); no tuning on
+  the final holdout.
+- Report sample size, dates, and known limitations explicitly. Never declare
+  success on win rate alone; no numeric pass/fail threshold is pre-approved —
+  it is set only after observing real results with real costs. **The system
+  is not described as having demonstrated an edge until this full-pipeline
+  evaluation — not just the zone comparison — has run** (ties into §7.6's
+  historical-data blocker, which must clear first).
 
 ### 7.8 Session-reset vs rolling ATR (optional, non-blocking)
 
@@ -626,9 +698,12 @@ Same input + same code version + same config reproduces the same result.
 
 - **Scanner:** all 50 rows, LTP/change, 15m trend, RS, per-symbol data-health
   status, bullish/bearish score. Coverage indicator (`N/50 healthy`).
-- **Shortlist:** up to three bullish, up to three bearish, with score
+- **Stage 1 shortlist:** up to five bullish, up to five bearish, with score
   components and reasons.
-- **Best pick / NO TRADE / PARTIAL:** one clearly labeled outcome with reasons.
+- **Final candidates:** up to two bullish and up to two bearish, selected
+  **independently per direction** — never a single combined "best pick."
+  Each direction independently shows `NO_TRADE` or `PARTIAL` with reasons
+  when applicable (§6).
 - **Detail view:** 15m and 5m charts, structure (swings/BOS/CHoCH), displacement,
   the active zone model with its state, entry/invalidation/stop/target, bearish
   status if applicable, score breakdown.
@@ -639,9 +714,9 @@ Same input + same code version + same config reproduces the same result.
 
 ## 11. Open decisions requiring the owner (recommendations given; not locked)
 
-1. **Universe-coverage threshold for a universe-wide best pick (§6).**
-   Recommend starting from a provisional value once Gate 0 (§9) produces real
-   feed-reliability data — not fixed now.
+1. **Universe-coverage threshold for a per-direction universe-wide result
+   (§6).** Recommend starting from a provisional value once Gate 0 (§9)
+   produces real feed-reliability data — not fixed now.
 2. **Net R:R minimum (§5.5).** Research hypothesis only (e.g. ≥1.5); calibrate
    from §7.5 results.
 3. **Same-day square-off cutoff for `BEARISH_EXECUTABLE_SHORT` (§5.6).** Needs
@@ -799,6 +874,71 @@ selection method (`comms/chatgpt`'s note, `comms/claude/030`'s response):
   floor, the ATR-wide-stop flag and session-timing exclusion windows were
   **discussed but deliberately not locked in this revision** — they await
   ChatGPT's confirmation (§4.8).
+
+### 13.3 Disposition of ChatGPT's "NOT APPROVED" review (2026-11-05, decided under the 70/30 authority)
+
+ChatGPT's independent review (reviewer-only, 30% stake) raised 8 findings.
+As 70% decision-maker, Claude's disposition, applied directly to this
+document rather than left as an open discussion:
+
+**Accepted and fixed:**
+- **Finding 2 (workflow contradicted in §2/§6/§10):** confirmed real — I had
+  updated §4/§12/§13 and `PRODUCT_BRIEF.md` for the 2+2 decision but missed
+  §2 step 5-6, §6 and §10, which still described "those six" and a single
+  best pick. Fixed throughout.
+- **Finding 4 (neutral-band logic reversed):** confirmed real — my §4.4
+  wording had the condition backward (required a *difference* to appear on
+  *both* lists, when a difference should instead assign the stronger
+  direction *only*, and *similarity* within the band is what makes a symbol
+  ambiguous). Fixed with the corrected logic.
+- **Finding 5 (restriction mixed into ranking gate, conflicting with §5.6):**
+  confirmed real — moved trading-restriction checks out of §4.6 ranking
+  eligibility; restriction now only affects `BEARISH_EXECUTABLE_SHORT`
+  promotion (§5.6), never Stage 1 score or eligibility.
+- **Finding 6 (backtest doesn't validate the full pipeline):** accepted —
+  §7.7 strengthened to require evaluating the ranking's value-add over a
+  baseline and per-direction final-candidate performance, not only the zone
+  comparison.
+- **Finding 7 (underspecified scoring):** accepted — momentum given an exact
+  signed-magnitude formula; both momentum and the RS threshold now carry an
+  explicit sensitivity-testing requirement in §7.7.
+- **Finding 8 (historical data blocker):** already correctly stated in §7.6;
+  no further change needed.
+- **Repository consistency (README.md, comms/STATE.md):** accepted in
+  principle — README.md still describes the pre-v0.3 derivative/3+3/single-
+  pick product and needs correction; `comms/STATE.md` is updated as part of
+  this turn's handoff. Both are tracked outside this document (README on
+  `main`, STATE on `comms`) and corrected under this same decision.
+
+**Not accepted, with reasoning:**
+- **Finding 1 (restore volume to a 10-point weighted score, 30/30/30/10=100):**
+  **Rejected.** This is not the owner's agreed model — the owner's own words
+  were "i'll go with yours," explicitly adopting Claude's recommended 90-point
+  model with volume as a tiebreak/quality modifier, not ChatGPT's original
+  25/25/20/20/10 (nor a 30/30/30/10 variant of it). Re-proposing the original
+  weighted-volume design as "the correct model" after the owner already chose
+  the alternative is re-litigating a settled decision without new evidence —
+  the exact pattern that led to ChatGPT's stake reduction. The volume-as-
+  modifier design stands. (The data-quality nuance in this finding — missing
+  baseline vs. an invalid current observation being different problems — is
+  reasonable and is retained conceptually in §4.2/§3.2, since those already
+  treat a bad current candle as a `§3.2` readiness issue, separate from an
+  absent historical baseline.)
+- **Finding 3, the "remove the dual zone-engine" portion:** **Rejected.**
+  The two-approach (§5.3/§5.4) zone definitions and the four-configuration
+  §7.5 comparison were an explicit, detailed owner ruling (F.4, 2026-11-05)
+  with the owner's own stated requirement to compare Approach A against
+  Approach B scientifically before picking one — this is not something either
+  agent should unilaterally discard. **Accepted instead:** Finding 3's
+  proposed 3-question Stage 2 *selection* layer is adopted in §4.8, sitting on
+  top of the existing zone mechanics rather than replacing them — this was
+  genuinely the open item ("rest check with ChatGPT") and is a good answer to
+  it, consistent with Claude's own earlier trader/analyst recommendation
+  (`comms/claude/030`).
+
+**No new indicators, filters, or architecture were added** beyond the
+corrections above, consistent with both agents' and the owner's governing
+principle.
 
 **No profitability claim is made by this document. All scoring weights,
 thresholds, the zone-model choice and the ATR-reset behaviour remain
