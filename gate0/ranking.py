@@ -251,6 +251,50 @@ def _bars_back_15m(bos_ts: datetime, bars: list[Bar], as_of_index: int) -> int |
     return None
 
 
+def _current_structure_state_detail(
+    structure: StructureResult, bars_15m: list[Bar], index: int,
+) -> tuple[str, datetime | None, str | None]:
+    """Shared by `structure_score` and `current_structure_state`: derives the
+    structure state (and the most recent BOS, if any) as of `bars_15m[index]`,
+    resetting at the 5m engine's own actual segment boundaries
+    (`structure.segment_starts`) rather than any 15m-timeframe inference —
+    see `structure_score`'s docstring (review 040 R1) for why."""
+    as_of_ts = bars_15m[index].bar_end_ts
+    prior_starts = [s for s in structure.segment_starts if s < as_of_ts]
+    segment_start_ts = max(prior_starts) if prior_starts else None
+    if segment_start_ts is None:
+        relevant: list = []
+    else:
+        relevant = [e for e in structure.events if segment_start_ts <= e.bar_start_ts < as_of_ts]
+    state = "NEUTRAL"
+    last_bos_ts: datetime | None = None
+    last_bos_dir: str | None = None
+    for ev in sorted(relevant, key=lambda e: e.bar_start_ts):
+        if ev.type in ("BOS_UP", "CHOCH_UP"):
+            state = "BULL"
+        elif ev.type in ("BOS_DOWN", "CHOCH_DOWN"):
+            state = "BEAR"
+        if ev.type in (BOS_UP, BOS_DOWN):
+            last_bos_ts = ev.bar_start_ts
+            last_bos_dir = "up" if ev.type == BOS_UP else "down"
+    return state, last_bos_ts, last_bos_dir
+
+
+def current_structure_state(
+    structure: StructureResult, bars_15m: list[Bar], *, index: int, calendar: TradingCalendar,
+) -> str:
+    """Public accessor for the raw structure state ("BULL" | "BEAR" |
+    "NEUTRAL") as of `bars_15m[index]`, independent of any queried
+    direction — used by Stage 2 (`setup.py`, §4.8 question 1) to check
+    directional confirmation without re-deriving this logic. `calendar` is
+    accepted for interface symmetry with the other ranking functions but is
+    not needed here (segment resets come from `structure.segment_starts`,
+    not from 15m segmentation)."""
+    _require_15m(bars_15m)
+    state, _, _ = _current_structure_state_detail(structure, bars_15m, index)
+    return state
+
+
 def structure_score(
     structure: StructureResult,
     bars_15m: list[Bar],
@@ -276,25 +320,7 @@ def structure_score(
     if direction not in ("up", "down"):
         raise RankingInputError(f"invalid direction: {direction}")
     _require_15m(bars_15m)
-    as_of_ts = bars_15m[index].bar_end_ts
-
-    prior_starts = [s for s in structure.segment_starts if s < as_of_ts]
-    segment_start_ts = max(prior_starts) if prior_starts else None
-    if segment_start_ts is None:
-        relevant: list = []
-    else:
-        relevant = [e for e in structure.events if segment_start_ts <= e.bar_start_ts < as_of_ts]
-    state = "NEUTRAL"
-    last_bos_ts: datetime | None = None
-    last_bos_dir: str | None = None
-    for ev in sorted(relevant, key=lambda e: e.bar_start_ts):
-        if ev.type in ("BOS_UP", "CHOCH_UP"):
-            state = "BULL"
-        elif ev.type in ("BOS_DOWN", "CHOCH_DOWN"):
-            state = "BEAR"
-        if ev.type in (BOS_UP, BOS_DOWN):
-            last_bos_ts = ev.bar_start_ts
-            last_bos_dir = "up" if ev.type == BOS_UP else "down"
+    state, last_bos_ts, last_bos_dir = _current_structure_state_detail(structure, bars_15m, index)
 
     state_sub = 15 if (state == "BULL" and direction == "up") or (state == "BEAR" and direction == "down") else 0
 
