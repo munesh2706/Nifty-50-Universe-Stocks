@@ -94,10 +94,26 @@ class DirectionResult:
 
 
 @dataclass(frozen=True)
+class ScannerRow:
+    """§10 "Scanner: all 50 rows" -- one row per supplied symbol, healthy or
+    not. `ltp` is the latest close at the scan's as-of time (None for an
+    unhealthy symbol, since there is no trustworthy as-of price to show)."""
+    symbol: str
+    healthy: bool
+    reason_codes: tuple[str, ...]
+    ltp: float | None
+    bull_total: int | None
+    bear_total: int | None
+    bull_eligible: bool | None
+    bear_eligible: bool | None
+
+
+@dataclass(frozen=True)
 class ScanResult:
     healthy_count: int
     total: int
     health: tuple[SymbolHealth, ...]
+    rows: tuple[ScannerRow, ...]
     stage1_shortlist: Shortlist
     bullish: DirectionResult
     bearish: DirectionResult
@@ -125,6 +141,11 @@ def _is_healthy(sb: SymbolBars) -> bool:
 
 def _instrument_ids_match(sb: SymbolBars) -> bool:
     return sb.bars_15m[0].instrument_id == sb.bars_5m[0].instrument_id
+
+
+def _unhealthy_row(h: SymbolHealth) -> ScannerRow:
+    return ScannerRow(symbol=h.symbol, healthy=False, reason_codes=h.reason_codes,
+                      ltp=None, bull_total=None, bear_total=None, bull_eligible=None, bear_eligible=None)
 
 
 def resolve_target_price(structure: StructureResult, direction: str, current_price: float) -> float | None:
@@ -224,19 +245,23 @@ def run_universe_scan(
 
     total = len(symbols)
     health: list[SymbolHealth] = []
+    rows: list[ScannerRow] = []
     scores: list[tuple[SymbolScore | None, SymbolScore | None]] = []
     score_by_symbol: dict[str, tuple[SymbolScore | None, SymbolScore | None]] = {}
     healthy_symbols: list[SymbolBars] = []
 
     for sb in symbols:
         if sb.bars_15m and sb.bars_5m and not _instrument_ids_match(sb):
-            health.append(SymbolHealth(sb.symbol, healthy=False, reason_codes=(INSTRUMENT_ID_MISMATCH,)))
+            h = SymbolHealth(sb.symbol, healthy=False, reason_codes=(INSTRUMENT_ID_MISMATCH,))
+            health.append(h); rows.append(_unhealthy_row(h))
             continue
         if not _is_healthy(sb):
-            health.append(SymbolHealth(sb.symbol, healthy=False, reason_codes=(DATA_UNAVAILABLE,)))
+            h = SymbolHealth(sb.symbol, healthy=False, reason_codes=(DATA_UNAVAILABLE,))
+            health.append(h); rows.append(_unhealthy_row(h))
             continue
         if sb.bars_15m[-1].bar_start_ts != universe_latest_ts:
-            health.append(SymbolHealth(sb.symbol, healthy=False, reason_codes=(STALE_LATEST_BAR,)))
+            h = SymbolHealth(sb.symbol, healthy=False, reason_codes=(STALE_LATEST_BAR,))
+            health.append(h); rows.append(_unhealthy_row(h))
             continue
         if sb.bars_5m[-1].bar_end_ts != sb.bars_15m[-1].bar_end_ts:
             # Review 051: Stage 2 (5m) must validate the SAME as-of market
@@ -248,7 +273,8 @@ def run_universe_scan(
             # completed 5m bar must end exactly when the latest 15m bar
             # ends. No new subsystem -- this is the same per-symbol health
             # check the staleness fix above already uses.
-            health.append(SymbolHealth(sb.symbol, healthy=False, reason_codes=(MISALIGNED_5M_DATA,)))
+            h = SymbolHealth(sb.symbol, healthy=False, reason_codes=(MISALIGNED_5M_DATA,))
+            health.append(h); rows.append(_unhealthy_row(h))
             continue
         healthy_symbols.append(sb)
         index = len(sb.bars_15m) - 1
@@ -263,9 +289,17 @@ def run_universe_scan(
                             volume_baseline=sb.volume_baseline, rs_threshold_pct=config.rs_threshold_pct,
                             qualifying_floor=config.qualifying_floor)
         if bull is None and bear is None:
-            health.append(SymbolHealth(sb.symbol, healthy=False, reason_codes=(DATA_UNAVAILABLE,)))
+            h = SymbolHealth(sb.symbol, healthy=False, reason_codes=(DATA_UNAVAILABLE,))
+            health.append(h); rows.append(_unhealthy_row(h))
             continue
         health.append(SymbolHealth(sb.symbol, healthy=True))
+        rows.append(ScannerRow(
+            symbol=sb.symbol, healthy=True, reason_codes=(), ltp=sb.bars_15m[index].close,
+            bull_total=bull.detail.total if bull is not None else None,
+            bear_total=bear.detail.total if bear is not None else None,
+            bull_eligible=bull.eligible if bull is not None else None,
+            bear_eligible=bear.eligible if bear is not None else None,
+        ))
         bull_in, bear_in = resolve_neutral_band(bull, bear, band=config.neutral_band)
         resolved = (bull if bull_in else None, bear if bear_in else None)
         scores.append(resolved)
@@ -293,7 +327,7 @@ def run_universe_scan(
     bullish = _direction_result("up", bullish_final, below_threshold)
     bearish = _direction_result("down", bearish_final, below_threshold)
 
-    return ScanResult(healthy_count=healthy_count, total=total, health=tuple(health),
+    return ScanResult(healthy_count=healthy_count, total=total, health=tuple(health), rows=tuple(rows),
                       stage1_shortlist=stage1_shortlist, bullish=bullish, bearish=bearish)
 
 
