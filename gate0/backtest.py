@@ -191,10 +191,18 @@ class ComparisonResult:
     default_choice: tuple[str, str]  # retained default when inconclusive: ("B", "full_range")
 
 
-def _resolve_configuration(
+def trade_outcomes_for_configuration(
     approach: str, boundary_type: str, displacements: list[Displacement], bars_5m: list[Bar],
-    *, calendar: TradingCalendar, target_resolver, quantity: Decimal, intraday: bool, cost_schedule: CostSchedule,
-) -> ConfigurationResult:
+    *, calendar: TradingCalendar, target_resolver, quantity: Decimal = Decimal(1),
+    intraday: bool = True, cost_schedule: CostSchedule = PLACEHOLDER_SCHEDULE,
+) -> list[TradeOutcome]:
+    """The raw per-displacement outcomes for one (approach, boundary_type)
+    configuration, for ONE instrument's own displacements/bars. Exposed
+    publicly (not just via `compare_zone_configurations`) so a caller
+    running many instruments (e.g. a full-universe Gate 4 replay) can pool
+    outcomes across instruments before summarizing -- `summarize_outcomes`
+    does that summarizing step, shared by both call paths.
+    """
     outcomes: list[TradeOutcome] = []
     for disp in displacements:
         zone = build_zone(disp, bars_5m, calendar=calendar, approach=approach, boundary_type=boundary_type)
@@ -205,7 +213,12 @@ def _resolve_configuration(
         outcome = simulate_trade(zone, bars_5m, target_price=target_price, quantity=quantity,
                                  intraday=intraday, cost_schedule=cost_schedule)
         outcomes.append(outcome)
+    return outcomes
 
+
+def summarize_outcomes(approach: str, boundary_type: str, outcomes: list[TradeOutcome]) -> ConfigurationResult:
+    """§7.5's evaluation measures computed from an already-gathered list of
+    `TradeOutcome` (one instrument's own, or many instruments pooled)."""
     qualified = [o for o in outcomes if o.outcome in (OUTCOME_WIN, OUTCOME_LOSS, OUTCOME_OPEN)]
     wins = sum(1 for o in outcomes if o.outcome == OUTCOME_WIN)
     losses = sum(1 for o in outcomes if o.outcome == OUTCOME_LOSS)
@@ -254,10 +267,11 @@ def compare_zone_configurations(
     """
     results: dict[tuple[str, str], ConfigurationResult] = {}
     for approach, boundary_type in ZONE_CONFIGURATIONS:
-        results[(approach, boundary_type)] = _resolve_configuration(
+        outcomes = trade_outcomes_for_configuration(
             approach, boundary_type, displacements, bars_5m, calendar=calendar,
             target_resolver=target_resolver, quantity=quantity, intraday=intraday, cost_schedule=cost_schedule,
         )
+        results[(approach, boundary_type)] = summarize_outcomes(approach, boundary_type, outcomes)
     overall_inconclusive = any(r.inconclusive for r in results.values())
     return ComparisonResult(configurations=results, overall_inconclusive=overall_inconclusive,
                             default_choice=("B", "full_range"))
