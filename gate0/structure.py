@@ -85,6 +85,13 @@ class StructureResult:
     events: list[StructureEvent] = field(default_factory=list)
     pivots: list[Pivot] = field(default_factory=list)
     pools: list[Pool] = field(default_factory=list)
+    # R1 (review 040): the bar_start_ts each 5m structure segment began at, in
+    # order. The state machine resets to NEUTRAL at every one of these points
+    # (including a segment with zero events) -- a consumer deriving "current
+    # state as of some later timestamp" must reset at the latest segment_start
+    # <= that timestamp, not infer resets from an unrelated timeframe's own
+    # segmentation.
+    segment_starts: tuple[datetime, ...] = field(default_factory=tuple)
 
 
 def _ticks(price: float, tick: float) -> int:
@@ -308,7 +315,9 @@ def detect_structure(
     all_events: list[StructureEvent] = []
     all_pivots: list[Pivot] = []
     all_pools: list[Pool] = []
+    segment_starts: list[datetime] = []
     for seg in _segment(bars, calendar, "5m"):
+        segment_starts.append(seg[0].bar_start_ts)
         pivots = _swings(seg, instrument)
         all_pivots.extend(pivots)
         all_pools.extend(_pools(seg, instrument, tick_size, tick_size_source))
@@ -320,4 +329,5 @@ def detect_structure(
         _ticks(e.level_price, tick_size) if e.level_price is not None else -1,
         e.level_id or "",
     ))
-    return StructureResult(events=all_events, pivots=all_pivots, pools=all_pools)
+    return StructureResult(events=all_events, pivots=all_pivots, pools=all_pools,
+                            segment_starts=tuple(segment_starts))

@@ -22,19 +22,37 @@ undocumented or reopened design decision. Whether this cross-timeframe
 reference is predictive is a backtest question (§7), not a code-review one.
 
 **Session-boundary correctness (review findings R1, R3):** structure state
-and session VWAP must never carry across a session/gap boundary (both reset
-per segment, matching `structure.py`'s own segmentation exactly — no new
-segmentation definition is invented here). EMA, by contrast, is a smooth
-rolling average that conventionally uses prior-session history to be
-genuinely warm; it is **not** reset per segment, but a symbol is fail-closed
-excluded (not partially scored) whenever EMA21 is not yet warm given the
-supplied history.
+and session VWAP must never carry across a session/gap boundary. Session
+VWAP is reset per the 15m series' own segmentation (matching
+`structure.py`'s segmentation function). **Structure state (review 040 R1
+follow-up)** is reset at the 5m structure engine's own actual segment
+boundaries (`StructureResult.segment_starts`, populated by `structure.py`
+itself), independent of the 15m series' own continuity — an intraday 5m data
+gap resets structure state here even when the 15m ranking series has no
+corresponding gap. EMA, by contrast, is a smooth rolling average that
+conventionally uses prior-session history to be genuinely warm; it is
+**not** reset per segment, but a symbol is fail-closed excluded (not
+partially scored) whenever EMA21 is not yet warm given the supplied history.
+
+**Elapsed-duration correctness (review 040 R2 follow-up):** matching
+timestamps between the stock and Nifty series at a given array offset is
+necessary but not sufficient — if the same 15m slot is missing from both
+series, the offset-based "then" position can still match by timestamp while
+no longer being exactly 15/30/60 minutes before "now". `rs_score` therefore
+also verifies the actual elapsed wall-clock duration for every interval.
+
+**Volume tiebreak neutrality (review 040 R5 follow-up):** per §4.2, volume
+"plays no role at all" when the baseline is unavailable. `build_shortlist`
+only compares relative-volume magnitude when BOTH tied candidates have an
+available ratio; otherwise the tie falls straight through to the
+alphabetical fallback, so an unavailable ratio never automatically loses to
+an available one.
 """
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from gate0.canonical_bars import Bar, validate_series
@@ -103,13 +121,18 @@ def rs_score(
     """§4.1 Relative strength: 10 pts per matched interval where sign agrees
     with direction and |diff| >= threshold. Max 30.
 
-    **R2 fix:** compares `Bar` objects, not raw float arrays, and verifies
-    that the stock/Nifty bars being compared at both the "now" and "then"
-    positions of every interval have **exactly matching timestamps** before
-    using them. Returns None (the whole symbol is unavailable for this
-    dimension) the moment any required interval cannot be timestamp-matched
-    — a missing candle on either side must never silently shift array
-    positions and produce a wrong score.
+    **R2 fix (review 040):** compares `Bar` objects, not raw float arrays,
+    and for every interval verifies BOTH (a) the stock/Nifty bars at the
+    "now" and "then" array positions have exactly matching timestamps, AND
+    (b) the elapsed time between the "then" bar's start and the "now" bar's
+    start equals exactly `bars_back * 15` minutes. (b) is the actual R2 gap:
+    matching timestamps alone does not prove the array offset spans the
+    intended 15/30/60-minute window -- if the *same* 15m slot is missing
+    from both series, the timestamps at a given array offset can still
+    agree with each other while no longer being 15/30/60 minutes apart, so a
+    75-minute return could otherwise be silently mislabeled as the 60-minute
+    interval. Returns None (the whole symbol is unavailable for this
+    dimension) the moment any required interval fails either check.
     """
     if direction not in ("up", "down"):
         raise RankingInputError(f"invalid direction: {direction}")
@@ -122,6 +145,7 @@ def rs_score(
 
     stock_closes = [b.close for b in stock_bars]
     nifty_closes = [b.close for b in nifty_bars]
+    now_ts = stock_bars[index].bar_start_ts
 
     score = 0
     intervals: list[tuple[int, Decimal | None]] = []
@@ -131,6 +155,9 @@ def rs_score(
             return None  # required interval unavailable -> exclude the symbol (per R2)
         if stock_bars[then_idx].bar_start_ts != nifty_bars[then_idx].bar_start_ts:
             return None  # timestamps don't match at the "then" position -> exclude
+        elapsed = now_ts - stock_bars[then_idx].bar_start_ts
+        if elapsed != timedelta(minutes=15 * bars_back):
+            return None  # array offset does not span the intended elapsed duration (R2)
         stock_ret = _pct_return(stock_closes, index, bars_back)
         nifty_ret = _pct_return(nifty_closes, index, bars_back)
         if stock_ret is None or nifty_ret is None:
@@ -214,23 +241,29 @@ def structure_score(
 ) -> tuple[int, int, int]:
     """§4.1 Market structure: returns (total 0-30, state_sub 0/15, recency_sub 0/15/8/0).
 
-    **R1 fix:** structure state and BOS recency are derived **only from events
-    within the current session segment** (the segment containing the as-of
-    15m bar) — a BOS from a prior session/gap segment can no longer leak into
-    today's state. Uses the same segmentation `structure.py` itself applies;
-    no new definition invented. No look-ahead: only events strictly before
-    the as-of bar's close are considered.
+    **R1 fix (review 040):** structure state and BOS recency are derived only
+    from events at or after the **actual 5m structure-engine segment boundary**
+    most recently reached as of this 15m bar — `structure.segment_starts`,
+    populated by `structure.py` itself at every point its own state machine
+    reset to NEUTRAL (including a gap segment with zero events). This is
+    independent of the 15m series' own continuity: an intraday 5m data gap
+    resets state here even when the 15m ranking series has no corresponding
+    gap. (The original fix inferred the reset point from the 15m segmentation,
+    which is a different timeframe's boundaries and is not guaranteed to
+    coincide with the 5m engine's own resets.) No look-ahead: only events
+    strictly before the as-of bar's close are considered.
     """
     if direction not in ("up", "down"):
         raise RankingInputError(f"invalid direction: {direction}")
     _require_15m(bars_15m)
-    window = bars_15m[: index + 1]
-    segments = _segment(window, calendar, "15m")
-    current_segment = segments[-1] if segments else window
-    segment_start_ts = current_segment[0].bar_start_ts
     as_of_ts = bars_15m[index].bar_end_ts
 
-    relevant = [e for e in structure.events if segment_start_ts <= e.bar_start_ts < as_of_ts]
+    prior_starts = [s for s in structure.segment_starts if s < as_of_ts]
+    segment_start_ts = max(prior_starts) if prior_starts else None
+    if segment_start_ts is None:
+        relevant: list = []
+    else:
+        relevant = [e for e in structure.events if segment_start_ts <= e.bar_start_ts < as_of_ts]
     state = "NEUTRAL"
     last_bos_ts: datetime | None = None
     last_bos_dir: str | None = None
@@ -350,16 +383,40 @@ class Shortlist:
 
 def build_shortlist(scores: list[tuple[SymbolScore | None, SymbolScore | None]], *, max_per_side: int = 5) -> Shortlist:
     """§4.7: up to `max_per_side` per direction, ranked by total score
-    descending, ties broken by **relative-volume magnitude** (R5: higher
-    ratio ranks first; unavailable sorts after any available ratio) then
-    alphabetically (display only). Never pads. `scores` is a list of
+    descending. Within an exact score tie, broken by **relative-volume
+    magnitude** (R5, fixed per review 040) only when BOTH tied candidates
+    have an available ratio (higher ratio ranks first); when a ratio is
+    unavailable for either candidate it plays no role at all per §4.2, and
+    the tie falls straight through to the alphabetical fallback. (The
+    original fix always ranked any available-ratio candidate ahead of any
+    unavailable one before comparing magnitude, which is itself a biased
+    tiebreak §4.2 forbids.) Never pads. `scores` is a list of
     (bull_score_or_None, bear_score_or_None) pairs, already neutral-band-
     resolved by the caller."""
-    def _sort_key(s: SymbolScore) -> tuple:
-        has_ratio = s.detail.volume_ratio is not None
-        ratio_rank = -s.detail.volume_ratio if has_ratio else 0.0
-        return (-s.detail.total, 0 if has_ratio else 1, ratio_rank, s.symbol)
+    def _group_key(s: SymbolScore) -> int:
+        return -s.detail.total
 
-    bulls = sorted((b for b, _ in scores if b is not None), key=_sort_key)[:max_per_side]
-    bears = sorted((b for _, b in scores if b is not None), key=_sort_key)[:max_per_side]
+    def _rank_side(candidates: list[SymbolScore]) -> list[SymbolScore]:
+        candidates = sorted(candidates, key=lambda s: s.symbol)
+        groups: dict[int, list[SymbolScore]] = {}
+        order: list[int] = []
+        for s in candidates:
+            key = _group_key(s)
+            if key not in groups:
+                groups[key] = []
+                order.append(key)
+            groups[key].append(s)
+        order.sort()
+        ranked: list[SymbolScore] = []
+        for key in order:
+            tied = groups[key]
+            if len(tied) > 1 and all(s.detail.volume_ratio is not None for s in tied):
+                tied = sorted(tied, key=lambda s: (-s.detail.volume_ratio, s.symbol))
+            else:
+                tied = sorted(tied, key=lambda s: s.symbol)
+            ranked.extend(tied)
+        return ranked
+
+    bulls = _rank_side([b for b, _ in scores if b is not None])[:max_per_side]
+    bears = _rank_side([b for _, b in scores if b is not None])[:max_per_side]
     return Shortlist(bullish=tuple(bulls), bearish=tuple(bears))

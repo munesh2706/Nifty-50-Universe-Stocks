@@ -93,12 +93,37 @@ def test_r2_misaligned_at_then_position_excludes_symbol():
     stock_part2 = make_bars15([102, 104, 108, 112, 115, 118],
                               start=NORMAL + timedelta(minutes=45))  # skips one 15m slot
     stock = stock_part1 + stock_part2
-    # stock[7] (now) happens to still be computed against nifty[7], but the
-    # "then" bar for the 60m interval (index 3) is no longer the same wall-
-    # clock bar as nifty[3] because of the earlier skip.
-    # Patch stock[7]'s timestamp to coincide with nifty[7] for a clean "now" match:
-    assert stock[7].bar_start_ts != nifty[3].bar_start_ts or True  # sanity: just exercise the path
+    # The gap only affects stock, so stock's "now" bar (idx 7) is NOT the same
+    # wall-clock bar as nifty's idx 7 -- this must fail the "now" check.
+    assert stock[7].bar_start_ts != nifty[7].bar_start_ts
     result = rs_score(stock, nifty, index=7, direction="up")
+    assert result is None
+
+
+def test_r2_shared_missing_slot_does_not_mislabel_elapsed_duration():
+    # Review 040 R2: the SAME 15m slot (9:45) is missing from BOTH stock and
+    # Nifty series. Every "now"/"then" timestamp pair still matches exactly
+    # between the two series -- the R2-038 fix alone would accept this -- but
+    # the array offset no longer spans the intended elapsed duration: the
+    # bars_back=1 ("15m") interval is actually 30 minutes apart in wall-clock
+    # time. This must still be excluded.
+    times = [NORMAL, NORMAL + timedelta(minutes=15)]
+    times += [NORMAL + timedelta(minutes=m) for m in (45, 60, 75, 90, 105, 120)]  # 9:45 dropped
+    closes = [100, 101, 102, 104, 108, 112, 115, 118]
+
+    def bars_at(times, closes, instrument):
+        return [Bar(instrument, "15m", t, t + timedelta(minutes=15), c, c + 1, c - 1, c, 1000.0)
+                for t, c in zip(times, closes)]
+
+    stock = bars_at(times, closes, "SYNTH")
+    nifty = bars_at(times, [100.0] * 8, "NIFTY50")
+    # "now" = idx 2 (9:45-slot's successor, 10:00), "then" (15m, bars_back=1) = idx 1 (9:30):
+    assert stock[2].bar_start_ts == nifty[2].bar_start_ts  # "now" matches
+    assert stock[1].bar_start_ts == nifty[1].bar_start_ts  # "then" also matches
+    # but the wall-clock gap between idx 1 and idx 2 is 30 minutes, not 15,
+    # because the 9:45 slot was dropped from both series:
+    assert (times[2] - times[1]) == timedelta(minutes=30)
+    result = rs_score(stock, nifty, index=2, direction="up")
     assert result is None
 
 
@@ -181,7 +206,7 @@ def test_structure_score_state_agrees_and_recent_bos():
     bars = make_bars15([100] * 10)
     bos_ts = bars[7].bar_start_ts
     ev = StructureEvent(BOS_UP, bos_ts, "up", 100.0, "SYNTH:x:H")
-    structure = StructureResult(events=[ev], pivots=[], pools=[])
+    structure = StructureResult(events=[ev], pivots=[], pools=[], segment_starts=(bars[0].bar_start_ts,))
     total, state_sub, recency_sub = structure_score(structure, bars, index=9, direction="up", calendar=CAL)
     assert state_sub == 15
     assert recency_sub == 15
@@ -191,7 +216,7 @@ def test_structure_score_state_agrees_and_recent_bos():
 def test_structure_score_disagreement_zeroes_both_subs():
     bars = make_bars15([100] * 10)
     ev = StructureEvent(BOS_DOWN, bars[7].bar_start_ts, "down", 100.0, "SYNTH:x:L")
-    structure = StructureResult(events=[ev], pivots=[], pools=[])
+    structure = StructureResult(events=[ev], pivots=[], pools=[], segment_starts=(bars[0].bar_start_ts,))
     total, state_sub, recency_sub = structure_score(structure, bars, index=9, direction="up", calendar=CAL)
     assert total == 0
 
@@ -203,10 +228,11 @@ def test_r1_prior_session_bos_does_not_leak_into_new_session():
     session1 = make_bars15([100] * 10, start=NORMAL)
     bos_ts = session1[7].bar_start_ts
     ev = StructureEvent(BOS_UP, bos_ts, "up", 100.0, "SYNTH:x:H")
-    structure = StructureResult(events=[ev], pivots=[], pools=[])
 
     session2 = make_bars15([100] * 5, start=EARLY)
     combined = session1 + session2
+    structure = StructureResult(events=[ev], pivots=[], pools=[],
+                                 segment_starts=(session1[0].bar_start_ts, session2[0].bar_start_ts))
     as_of_index = len(combined) - 1  # last bar of session 2, no new events
 
     total, state_sub, recency_sub = structure_score(structure, combined, index=as_of_index,
@@ -219,10 +245,57 @@ def test_r1_prior_session_bos_does_not_leak_into_new_session():
 def test_structure_score_old_bos_recency_zero_within_same_session():
     bars = make_bars15([100] * 15)
     ev = StructureEvent(BOS_UP, bars[0].bar_start_ts, "up", 100.0, "SYNTH:x:H")
-    structure = StructureResult(events=[ev], pivots=[], pools=[])
+    structure = StructureResult(events=[ev], pivots=[], pools=[], segment_starts=(bars[0].bar_start_ts,))
     total, state_sub, recency_sub = structure_score(structure, bars, index=14, direction="up", calendar=CAL)
     assert state_sub == 15
     assert recency_sub == 0  # 14 bars back, outside the 10-bar window, same session
+
+
+# --- structure_score R1 (review 040): intraday 5m gap resets state even when
+# the 15m ranking series itself remains fully contiguous. ---
+
+def test_r1_intraday_5m_gap_resets_state_with_contiguous_15m_series():
+    # A single, fully contiguous 15m series (no 15m-level gap at all). The 5m
+    # structure engine, however, hit a missing 5m slot partway through and
+    # reset to NEUTRAL there (segment_starts has two entries) -- a BOS before
+    # that 5m reset must not keep scoring after it, even though nothing about
+    # the 15m series itself changed.
+    bars = make_bars15([100] * 10)
+    bos_ts = bars[2].bar_start_ts
+    ev = StructureEvent(BOS_UP, bos_ts, "up", 100.0, "SYNTH:x:H")
+    # The 5m engine reset (new segment) at bars[5] -- strictly inside this one
+    # contiguous 15m series, unrelated to any 15m segmentation boundary.
+    structure = StructureResult(events=[ev], pivots=[], pools=[],
+                                 segment_starts=(bars[0].bar_start_ts, bars[5].bar_start_ts))
+    total, state_sub, recency_sub = structure_score(structure, bars, index=9, direction="up", calendar=CAL)
+    assert state_sub == 0, "a BOS before an intraday 5m-engine reset must not leak past it"
+    assert recency_sub == 0
+    assert total == 0
+
+
+def test_r1_intraday_5m_gap_resets_state_with_contiguous_15m_series_down():
+    # Symmetric BOS_DOWN case.
+    bars = make_bars15([100] * 10)
+    ev = StructureEvent(BOS_DOWN, bars[2].bar_start_ts, "down", 100.0, "SYNTH:x:L")
+    structure = StructureResult(events=[ev], pivots=[], pools=[],
+                                 segment_starts=(bars[0].bar_start_ts, bars[5].bar_start_ts))
+    total, state_sub, recency_sub = structure_score(structure, bars, index=9, direction="down", calendar=CAL)
+    assert state_sub == 0, "a BOS_DOWN before an intraday 5m-engine reset must not leak past it"
+    assert recency_sub == 0
+    assert total == 0
+
+
+def test_structure_score_bos_after_5m_reset_still_scores():
+    # Sanity check for the fix above: a BOS occurring AFTER the 5m-engine
+    # reset point must still score normally.
+    bars = make_bars15([100] * 10)
+    ev = StructureEvent(BOS_UP, bars[7].bar_start_ts, "up", 100.0, "SYNTH:x:H")
+    structure = StructureResult(events=[ev], pivots=[], pools=[],
+                                 segment_starts=(bars[0].bar_start_ts, bars[5].bar_start_ts))
+    total, state_sub, recency_sub = structure_score(structure, bars, index=9, direction="up", calendar=CAL)
+    assert state_sub == 15
+    assert recency_sub == 15
+    assert total == 30
 
 
 # --- score_symbol (missing data / UNAVAILABLE, now covering R2/R3 end-to-end) ---
@@ -262,7 +335,7 @@ def test_score_symbol_eligible_strong_bullish():
     stock = make_bars15(closes)
     nifty = flat_nifty(25)
     ev = StructureEvent(BOS_UP, stock[22].bar_start_ts, "up", 100.0, "SYNTH:x:H")
-    structure = StructureResult(events=[ev], pivots=[], pools=[])
+    structure = StructureResult(events=[ev], pivots=[], pools=[], segment_starts=(stock[0].bar_start_ts,))
     result = score_symbol("GOODSTOCK", "up", stock_bars_15m=stock, nifty_bars_15m=nifty,
                           structure=structure, index=24, calendar=CAL)
     assert result is not None
@@ -275,7 +348,7 @@ def test_score_symbol_volume_ratio_preserved():
     stock = make_bars15(closes, volumes=[1000.0] * 24 + [2500.0])
     nifty = flat_nifty(25)
     ev = StructureEvent(BOS_UP, stock[22].bar_start_ts, "up", 100.0, "SYNTH:x:H")
-    structure = StructureResult(events=[ev], pivots=[], pools=[])
+    structure = StructureResult(events=[ev], pivots=[], pools=[], segment_starts=(stock[0].bar_start_ts,))
     result = score_symbol("GOODSTOCK", "up", stock_bars_15m=stock, nifty_bars_15m=nifty,
                           structure=structure, index=24, calendar=CAL, volume_baseline=1000.0)
     assert result.detail.volume_flag == "available"
@@ -343,3 +416,19 @@ def test_shortlist_tiebreak_uses_volume_ratio_magnitude():
     high_vol = SymbolScore("HIGH", "up", DimensionDetail(60, (), 0, 0, 0, 0, 0, 0, "available", 3.5, 60), True)
     sl = build_shortlist([(low_vol, None), (high_vol, None)], max_per_side=5)
     assert sl.bullish[0].symbol == "HIGH"  # higher relative-volume ratio ranks first on a tie
+
+
+def test_shortlist_unavailable_ratio_does_not_automatically_lose_tie():
+    # Review 040 R5: §4.2 says volume "plays no role at all" when the
+    # baseline is unavailable -- an unavailable-ratio candidate must NOT
+    # automatically rank behind an available-ratio candidate on an exact
+    # score tie. With no usable ratio on both sides of the tie, the
+    # alphabetical fallback decides, regardless of which one happens to
+    # have an available ratio.
+    from gate0.ranking import DimensionDetail, SymbolScore
+    no_ratio = SymbolScore("AAA", "up", DimensionDetail(60, (), 0, 0, 0, 0, 0, 0, "unavailable", None, 60), True)
+    has_ratio = SymbolScore("ZZZ", "up", DimensionDetail(60, (), 0, 0, 0, 0, 0, 0, "available", 0.5, 60), True)
+    sl = build_shortlist([(no_ratio, None), (has_ratio, None)], max_per_side=5)
+    # Both tied at total=60; since they don't BOTH have a ratio, volume plays
+    # no role at all and alphabetical order decides: AAA before ZZZ.
+    assert sl.bullish[0].symbol == "AAA"

@@ -4,7 +4,7 @@ An explainable intraday stock-selection and market-structure analysis dashboard 
 
 ## Project status
 **Phase:** Strategy specification (v0.3) and Phase A implementation
-**Implementation:** `canonical_bars`, `nse_calendar`, `structure`, `displacement` and the Stage 1 directional **ranking** module (`gate0/ranking.py`, `gate0/indicators.py`) accepted; Stage 2 setup module, dashboard and live integration not started
+**Implementation:** `canonical_bars`, `nse_calendar`, `structure` and `displacement` accepted; the Stage 1 directional **ranking** module (`gate0/ranking.py`, `gate0/indicators.py`) is implemented and **pending independent review** (ChatGPT review 040, 2026-11-06) — Stage 2 must not be built on top of it until that review accepts it; dashboard and live integration not started
 **Data evidence:** Angel One SmartAPI's historical endpoint confirmed working against the owner's real account — 49/50 constituents + the Nifty 50 index show clean, consistent 5m/15m coverage across a 90-day window (~59 trading sessions; v0.3 §13.6-§13.7)
 **Underlying universe:** Nifty 50 cash-equity constituents only — no futures, options, F&O eligibility, expiries, lot sizes, strikes, Greeks, IV or derivative scoring
 **Data provider:** Angel One SmartAPI (cash-equity endpoints only)
@@ -31,7 +31,7 @@ rather than as relative links (which would not resolve on `main`).
 - [Current task state](https://github.com/munesh2706/Nifty-50-Universe-Stocks/blob/comms/comms/STATE.md) *(on the `comms` branch)*
 
 ## Current state
-The strategy specification (v0.3) is a cash-equity-only research baseline. Weights, thresholds and SMC rules are not proven profitable and require deterministic tests, historical replay and out-of-sample validation. No automatic order placement is authorised. A historical cash-equity data source is not yet confirmed as available — this is a genuine blocker to historical validation (v0.3 §7.6).
+The strategy specification (v0.3) is a cash-equity-only research baseline. Weights, thresholds and SMC rules are not proven profitable and require deterministic tests, historical replay and out-of-sample validation. No automatic order placement is authorised. Angel One SmartAPI's historical endpoint is confirmed working against the owner's real account (49/50 constituents + the Nifty 50 index, 5m/15m, ~59 sessions over a 90-day window; v0.3 §13.6-§13.7) — the TATAMOTORS instrument-master mapping remains unresolved, and whether ~59 sessions give enough displacement frequency for the §7.5 backtest evidence bar (≥100 qualified setups per zone configuration) is not yet established.
 
 ## Research and safety
 This is a decision-support research project, not a promise of trading performance. All strategy logic must be tested with point-in-time data, realistic brokerage/statutory costs, spread, slippage and out-of-sample validation before live use.
