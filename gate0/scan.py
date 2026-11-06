@@ -44,6 +44,7 @@ STATUS_NO_TRADE = "NO_TRADE"
 DATA_UNAVAILABLE = "DATA_UNAVAILABLE"
 STALE_LATEST_BAR = "STALE_LATEST_BAR"
 MISALIGNED_5M_DATA = "MISALIGNED_5M_DATA"
+INSTRUMENT_ID_MISMATCH = "INSTRUMENT_ID_MISMATCH"
 COVERAGE_BELOW_THRESHOLD = "COVERAGE_BELOW_THRESHOLD"
 NO_DIRECTIONAL_EDGE = "NO_DIRECTIONAL_EDGE"
 
@@ -109,7 +110,21 @@ def _is_healthy(sb: SymbolBars) -> bool:
         return False
     if validate_series(sb.bars_5m, require_complete=True):
         return False
+    # Review 052: both series are individually validated above, but nothing
+    # compared their instrument identities -- a mismatched pair (e.g. a
+    # provider-side mix-up handing one symbol's 15m bars alongside another
+    # symbol's 5m bars) would otherwise let Stage 1 rank one stock while
+    # Stage 2 silently validates a different one. Checked here (not just
+    # inside run_universe_scan's own health gate) so any other caller of
+    # `_is_healthy` gets the same protection; `run_universe_scan` still
+    # reports the specific `INSTRUMENT_ID_MISMATCH` reason code separately.
+    if sb.bars_15m[0].instrument_id != sb.bars_5m[0].instrument_id:
+        return False
     return True
+
+
+def _instrument_ids_match(sb: SymbolBars) -> bool:
+    return sb.bars_15m[0].instrument_id == sb.bars_5m[0].instrument_id
 
 
 def resolve_target_price(structure: StructureResult, direction: str, current_price: float) -> float | None:
@@ -214,6 +229,9 @@ def run_universe_scan(
     healthy_symbols: list[SymbolBars] = []
 
     for sb in symbols:
+        if sb.bars_15m and sb.bars_5m and not _instrument_ids_match(sb):
+            health.append(SymbolHealth(sb.symbol, healthy=False, reason_codes=(INSTRUMENT_ID_MISMATCH,)))
+            continue
         if not _is_healthy(sb):
             health.append(SymbolHealth(sb.symbol, healthy=False, reason_codes=(DATA_UNAVAILABLE,)))
             continue

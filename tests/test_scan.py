@@ -14,6 +14,7 @@ from gate0.nse_calendar import SAMPLE_CALENDAR, TradingCalendar
 from gate0.scan import (
     COVERAGE_BELOW_THRESHOLD,
     DATA_UNAVAILABLE,
+    INSTRUMENT_ID_MISMATCH,
     MISALIGNED_5M_DATA,
     STALE_LATEST_BAR,
     STATUS_NO_TRADE,
@@ -217,6 +218,36 @@ def test_aligned_5m_and_15m_data_scores_normally():
     result = run_universe_scan([good], nifty, calendar=CAL, config=config)
     health = next(h for h in result.health if h.symbol == "GOODSTOCK")
     assert health.healthy
+    assert result.bullish.status == STATUS_UNIVERSE_WIDE
+
+
+# --- review 052: the 15m and 5m series must belong to the same instrument ---
+
+def test_mismatched_instrument_ids_between_15m_and_5m_series_rejected():
+    # Both series are individually valid and time-aligned -- the 5m series
+    # is simply a DIFFERENT symbol's bars. Stage 1 would otherwise rank
+    # GOODSTOCK while Stage 2 silently validated WRONGSTOCK.
+    good = strong_bullish_symbol()
+    other_instrument_5m = [
+        Bar("WRONGSTOCK", b.timeframe, b.bar_start_ts, b.bar_end_ts, b.open, b.high, b.low, b.close, b.volume)
+        for b in good.bars_5m
+    ]
+    mismatched = SymbolBars(symbol="GOODSTOCK", bars_15m=good.bars_15m, bars_5m=other_instrument_5m,
+                            volume_baseline=1000.0)
+    nifty = flat_nifty_15m()
+    config = ScanConfig(coverage_threshold=1)
+    result = run_universe_scan([mismatched], nifty, calendar=CAL, config=config)
+    health = next(h for h in result.health if h.symbol == "GOODSTOCK")
+    assert not health.healthy
+    assert INSTRUMENT_ID_MISMATCH in health.reason_codes
+    assert result.healthy_count == 0
+
+
+def test_golden_path_unaffected_when_instruments_match():
+    good = strong_bullish_symbol()
+    nifty = flat_nifty_15m()
+    config = ScanConfig(coverage_threshold=1)
+    result = run_universe_scan([good], nifty, calendar=CAL, config=config)
     assert result.bullish.status == STATUS_UNIVERSE_WIDE
 
 
