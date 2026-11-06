@@ -14,6 +14,7 @@ from gate0.nse_calendar import SAMPLE_CALENDAR, TradingCalendar
 from gate0.scan import (
     COVERAGE_BELOW_THRESHOLD,
     DATA_UNAVAILABLE,
+    MISALIGNED_5M_DATA,
     STALE_LATEST_BAR,
     STATUS_NO_TRADE,
     STATUS_PARTIAL,
@@ -41,11 +42,19 @@ def bars15(closes, start=NORMAL, instrument="SYNTH"):
     return out
 
 
-def strong_bullish_5m_bars():
+def strong_bullish_5m_bars(pad_to_session_close=True):
     """14-bar ATR warmup, a real swing-high BOS_UP confirmed at 11:15, a
     qualifying single-bar displacement on that same bar, a touch then a
     confirmation close beyond the Approach-B zone's proximal (31), and a
-    later confirmed swing high (55) that resolve_target_price can use."""
+    later confirmed swing high (55) that resolve_target_price can use.
+
+    **Review 051:** by default, pads with flat bars through the session's
+    own last 5m slot (15:25-15:30), so the 5m series' last bar_end matches
+    the 15m series' last bar_end (15:30) -- Stage 2 must validate the SAME
+    as-of moment Stage 1 selected, per §4.8. The zone already confirms
+    (and `advance_zone` stops) well before the padding, so the padding
+    cannot change the zone outcome -- it only fixes the as-of-time mismatch.
+    """
     cur = NORMAL
     bars = []
     for _ in range(14):
@@ -60,12 +69,18 @@ def strong_bullish_5m_bars():
                        (35, 36, 34, 35), (35, 36, 34, 35)]:
         bars.append(bar5(o, h, l, c, cur)); cur += timedelta(minutes=5)       # confirmed swing high (55) for the target
     bars.append(bar5(35, 36, 34, 36, cur)); cur += timedelta(minutes=5)      # current price (36), below the target
+    if pad_to_session_close:
+        last_slot = CAL.expected_bar_starts(NORMAL.date(), "5m")[-1]
+        while cur <= last_slot:
+            bars.append(bar5(36, 36.5, 35.5, 36, cur))
+            cur += timedelta(minutes=5)
     return bars
 
 
-def strong_bullish_symbol(symbol="GOODSTOCK"):
+def strong_bullish_symbol(symbol="GOODSTOCK", pad_5m_to_session_close=True):
     closes15 = [100 + i * 0.6 for i in range(25)]
-    return SymbolBars(symbol=symbol, bars_15m=bars15(closes15), bars_5m=strong_bullish_5m_bars(),
+    return SymbolBars(symbol=symbol, bars_15m=bars15(closes15),
+                      bars_5m=strong_bullish_5m_bars(pad_5m_to_session_close),
                       volume_baseline=1000.0)
 
 
@@ -74,9 +89,11 @@ def flat_nifty_15m(n=25):
 
 
 def neutral_symbol(symbol="FLATSTOCK"):
-    bars = [bar5(100.0, 100.5, 99.5, 100.0, NORMAL + timedelta(minutes=5 * i)) for i in range(40)]
     closes15 = [100.0] * 25
-    return SymbolBars(symbol=symbol, bars_15m=bars15(closes15), bars_5m=bars, volume_baseline=1000.0)
+    stock15 = bars15(closes15)
+    n_5m_bars = (stock15[-1].bar_end_ts - NORMAL) // timedelta(minutes=5)  # align through the same as-of time
+    bars = [bar5(100.0, 100.5, 99.5, 100.0, NORMAL + timedelta(minutes=5 * i)) for i in range(n_5m_bars)]
+    return SymbolBars(symbol=symbol, bars_15m=stock15, bars_5m=bars, volume_baseline=1000.0)
 
 
 def invalid_symbol(symbol="BADSTOCK"):
@@ -155,6 +172,52 @@ def test_symbol_matching_universe_latest_bar_is_still_scored_normally():
     good_health = next(h for h in result.health if h.symbol == "GOODSTOCK")
     assert good_health.healthy
     assert good_health.reason_codes == ()
+
+
+# --- review 051: Stage 2's 5m data must be as-of the SAME moment as Stage 1's 15m data ---
+
+def test_stale_5m_data_behind_the_scan_reference_is_misaligned():
+    # 15m data is current (through 15:30, matching Nifty), but 5m data is
+    # NOT padded -- it stops around 12:00. Stage 2 would otherwise validate
+    # an older market moment than Stage 1 selected.
+    good = strong_bullish_symbol(pad_5m_to_session_close=False)
+    nifty = flat_nifty_15m()
+    assert good.bars_5m[-1].bar_end_ts < good.bars_15m[-1].bar_end_ts  # sanity: genuinely stale
+    config = ScanConfig(coverage_threshold=1)
+    result = run_universe_scan([good], nifty, calendar=CAL, config=config)
+    health = next(h for h in result.health if h.symbol == "GOODSTOCK")
+    assert not health.healthy
+    assert MISALIGNED_5M_DATA in health.reason_codes
+    assert result.healthy_count == 0  # excluded entirely, not scored on stale 5m data
+    assert result.bullish.candidates == ()
+
+
+def test_future_5m_data_beyond_the_scan_reference_is_misaligned_not_lookahead():
+    # 5m data extends PAST the 15m as-of time -- must be rejected rather
+    # than silently handed to Stage 2 as look-ahead information.
+    good = strong_bullish_symbol(pad_5m_to_session_close=True)
+    extra_future = Bar("SYNTH", "5m", good.bars_5m[-1].bar_end_ts,
+                       good.bars_5m[-1].bar_end_ts + timedelta(minutes=5), 36, 36.5, 35.5, 36, 1000.0)
+    future_bars = SymbolBars(symbol="GOODSTOCK", bars_15m=good.bars_15m,
+                             bars_5m=good.bars_5m + [extra_future], volume_baseline=1000.0)
+    nifty = flat_nifty_15m()
+    assert future_bars.bars_5m[-1].bar_end_ts > future_bars.bars_15m[-1].bar_end_ts  # sanity: genuinely ahead
+    config = ScanConfig(coverage_threshold=1)
+    result = run_universe_scan([future_bars], nifty, calendar=CAL, config=config)
+    health = next(h for h in result.health if h.symbol == "GOODSTOCK")
+    assert not health.healthy
+    assert MISALIGNED_5M_DATA in health.reason_codes
+
+
+def test_aligned_5m_and_15m_data_scores_normally():
+    good = strong_bullish_symbol(pad_5m_to_session_close=True)
+    assert good.bars_5m[-1].bar_end_ts == good.bars_15m[-1].bar_end_ts
+    nifty = flat_nifty_15m()
+    config = ScanConfig(coverage_threshold=1)
+    result = run_universe_scan([good], nifty, calendar=CAL, config=config)
+    health = next(h for h in result.health if h.symbol == "GOODSTOCK")
+    assert health.healthy
+    assert result.bullish.status == STATUS_UNIVERSE_WIDE
 
 
 # --- coverage threshold: PARTIAL vs NO_TRADE are never conflated ---

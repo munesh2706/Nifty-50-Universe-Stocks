@@ -43,6 +43,7 @@ STATUS_NO_TRADE = "NO_TRADE"
 
 DATA_UNAVAILABLE = "DATA_UNAVAILABLE"
 STALE_LATEST_BAR = "STALE_LATEST_BAR"
+MISALIGNED_5M_DATA = "MISALIGNED_5M_DATA"
 COVERAGE_BELOW_THRESHOLD = "COVERAGE_BELOW_THRESHOLD"
 NO_DIRECTIONAL_EDGE = "NO_DIRECTIONAL_EDGE"
 
@@ -188,6 +189,19 @@ def run_universe_scan(
     latest 15m bar must equal Nifty's latest 15m bar's timestamp, checked
     BEFORE scoring; otherwise the symbol is `DATA_UNAVAILABLE`
     (`STALE_LATEST_BAR`), never silently ranked at an older point in time.
+
+    **Review 051 fix:** fixing the 15m/Nifty alignment above was not
+    sufficient -- `_evaluate_candidate` separately consumes the symbol's
+    *entire* 5m series (for `detect_structure`/`detect_displacement`, the
+    zone lifecycle, and `current_price = bars_5m[-1].close`) with no check
+    against the 15m as-of time at all. Stage 2 (5m) must validate the SAME
+    market moment Stage 1 (15m) selected, per §4.8 -- not an older moment
+    (stale 5m data behind the reference time) and not a newer one (5m bars
+    extending past it, which would let future price action leak into the
+    decision as look-ahead). Fixed with the simplest precondition for this
+    single-as-of-point design: a symbol's latest completed 5m bar must end
+    at exactly the same timestamp as its latest 15m bar; otherwise
+    `DATA_UNAVAILABLE` (`MISALIGNED_5M_DATA`).
     """
     if not nifty_bars_15m:
         raise ScanInputError("nifty_bars_15m must not be empty")
@@ -205,6 +219,18 @@ def run_universe_scan(
             continue
         if sb.bars_15m[-1].bar_start_ts != universe_latest_ts:
             health.append(SymbolHealth(sb.symbol, healthy=False, reason_codes=(STALE_LATEST_BAR,)))
+            continue
+        if sb.bars_5m[-1].bar_end_ts != sb.bars_15m[-1].bar_end_ts:
+            # Review 051: Stage 2 (5m) must validate the SAME as-of market
+            # moment Stage 1 (15m) selected -- not an older one (stale 5m
+            # data behind the scan's reference time) and not a newer one
+            # (5m bars extending past it, which would let future price
+            # action leak into the decision as look-ahead). The simplest
+            # precondition for this single-as-of-point design: the latest
+            # completed 5m bar must end exactly when the latest 15m bar
+            # ends. No new subsystem -- this is the same per-symbol health
+            # check the staleness fix above already uses.
+            health.append(SymbolHealth(sb.symbol, healthy=False, reason_codes=(MISALIGNED_5M_DATA,)))
             continue
         healthy_symbols.append(sb)
         index = len(sb.bars_15m) - 1
