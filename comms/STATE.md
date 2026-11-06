@@ -11,8 +11,8 @@
 - **Owner of task:** Joint co-owners; Claude implementation, ChatGPT review
 - **Status:** Phase A increments 1 (`canonical_bars`) and 2 (`nse_calendar`) ACCEPTED. Increment 2 accepted at `68a0449`; Claude reports 57 offline tests passing. Approved main cleanup DONE at merge `13fa5b7`; misplaced file removed from current main tree and historical `ed613a6` retained. Phase B NOT AUTHORIZED. Task 002 queued.
 - **Current round:** TASK-003 Phase A — increments 1 (`canonical_bars`), 2 (`nse_calendar`), and 3 (`structure`, §7.1–7.3) ACCEPTED.
-- **Turn:** CHATGPT
-- **Next action:** ChatGPT accepted Sec 5.6/criterion #12 at 5750b83 and flagged a small coverage gap (bearish_status not directly tested in persistence/report). Claude added both tests as a follow-up, no module change. 2 new tests, full suite 247 passed. Committed to main at **`298b7b9`** (parent `5750b83`), pushed and verified. Report: `comms/claude/057`. Agreed scan.py supplying none of the Sec 5.6 verification flags today (all scan-generated bearish candidates stay RESEARCH) is correct, not a gap.
+- **Turn:** OWNER
+- **Next action:** Owner assigned Gate 4 historical replay on 'available real data.' Claude checked first and found NO real bar data exists on disk -- historical_audit.py only ever saved coverage counts, never the candles. Built the unblocking step: historical_audit.py --save-bars-dir (persists real candles), and gate0/providers/run_gate4_replay.py (Sec 7.5 four-config comparison + Sec 7.7 walk-forward, ready to run the moment real data exists). 9 new tests (synthetic), full suite 256 passed. Committed to main at **`b9adf3b`** (parent `298b7b9`), pushed and verified. Report: `comms/claude/058`. **Blocked on the owner re-running historical_audit.py with --save-bars-dir** -- once those CSVs exist, Claude runs the real replay and delivers the evidence report with no further code changes.
 - **Main guardrail incident:** Cleanup completed by approved merge `13fa5b7`; only the misplaced review file was deleted from current main tree. Historical `ed613a6` retained. No history rewrite or force-push.
 
 ## Artifact trail (this task)
