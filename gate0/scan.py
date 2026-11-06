@@ -42,6 +42,7 @@ STATUS_PARTIAL = "PARTIAL"
 STATUS_NO_TRADE = "NO_TRADE"
 
 DATA_UNAVAILABLE = "DATA_UNAVAILABLE"
+STALE_LATEST_BAR = "STALE_LATEST_BAR"
 COVERAGE_BELOW_THRESHOLD = "COVERAGE_BELOW_THRESHOLD"
 NO_DIRECTIONAL_EDGE = "NO_DIRECTIONAL_EDGE"
 
@@ -170,10 +171,28 @@ def run_universe_scan(
     calendar: TradingCalendar,
     config: ScanConfig = ScanConfig(),
 ) -> ScanResult:
-    """§4-§6 end to end, for one as-of point (the latest supplied 15m bar of
-    each symbol). Each symbol is scored independently; a symbol's own data
-    problem never blocks any other symbol (§3.2's per-symbol `DATA_UNAVAILABLE`,
-    never a global failure)."""
+    """§4-§6 end to end, for one as-of point -- the universe's shared clock,
+    the latest supplied Nifty 15m bar. Each symbol is scored independently;
+    a symbol's own data problem never blocks any other symbol (§3.2's
+    per-symbol `DATA_UNAVAILABLE`, never a global failure).
+
+    **Review 050 fix:** every symbol used to be ranked "as of" its OWN
+    latest supplied 15m bar (`len(sb.bars_15m) - 1`), with no check that
+    this was actually the same wall-clock bar as Nifty's latest. A symbol
+    missing only its single most-recent candle would silently be ranked one
+    bar stale relative to the rest of the universe -- `validate_series`
+    does not check expected-slot coverage, and `rs_score`'s own timestamp
+    check only compares the two arrays AT THE SAME INDEX, which stays
+    internally consistent even when that shared index is each symbol's own
+    stale "latest," not the universe's actual latest. Fixed: every symbol's
+    latest 15m bar must equal Nifty's latest 15m bar's timestamp, checked
+    BEFORE scoring; otherwise the symbol is `DATA_UNAVAILABLE`
+    (`STALE_LATEST_BAR`), never silently ranked at an older point in time.
+    """
+    if not nifty_bars_15m:
+        raise ScanInputError("nifty_bars_15m must not be empty")
+    universe_latest_ts = nifty_bars_15m[-1].bar_start_ts
+
     total = len(symbols)
     health: list[SymbolHealth] = []
     scores: list[tuple[SymbolScore | None, SymbolScore | None]] = []
@@ -183,6 +202,9 @@ def run_universe_scan(
     for sb in symbols:
         if not _is_healthy(sb):
             health.append(SymbolHealth(sb.symbol, healthy=False, reason_codes=(DATA_UNAVAILABLE,)))
+            continue
+        if sb.bars_15m[-1].bar_start_ts != universe_latest_ts:
+            health.append(SymbolHealth(sb.symbol, healthy=False, reason_codes=(STALE_LATEST_BAR,)))
             continue
         healthy_symbols.append(sb)
         index = len(sb.bars_15m) - 1

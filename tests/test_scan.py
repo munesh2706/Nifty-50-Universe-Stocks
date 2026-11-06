@@ -14,6 +14,7 @@ from gate0.nse_calendar import SAMPLE_CALENDAR, TradingCalendar
 from gate0.scan import (
     COVERAGE_BELOW_THRESHOLD,
     DATA_UNAVAILABLE,
+    STALE_LATEST_BAR,
     STATUS_NO_TRADE,
     STATUS_PARTIAL,
     STATUS_UNIVERSE_WIDE,
@@ -122,6 +123,38 @@ def test_bad_symbol_marked_unavailable_others_still_scanned():
     assert not bad_health.healthy
     assert DATA_UNAVAILABLE in bad_health.reason_codes
     assert result.bullish.status == STATUS_UNIVERSE_WIDE  # unaffected by BADSTOCK
+
+
+# --- review 050: a symbol stale relative to the universe's own clock ---
+
+def test_symbol_missing_only_its_latest_bar_is_stale_not_silently_ranked():
+    # Nifty (and the rest of the universe) has data through the latest 15m
+    # bar; this symbol's OWN latest supplied bar is one slot older (its most
+    # recent candle is simply missing) -- every per-bar field is otherwise
+    # valid, so validate_series alone would not catch it. It must be marked
+    # DATA_UNAVAILABLE (STALE_LATEST_BAR), never ranked "as of" its own
+    # older bar while the rest of the universe is judged as of now.
+    good = strong_bullish_symbol()
+    nifty = flat_nifty_15m()
+    stale = SymbolBars(symbol="STALESTOCK", bars_15m=good.bars_15m[:-1],  # drop only the latest bar
+                       bars_5m=good.bars_5m, volume_baseline=1000.0)
+    config = ScanConfig(coverage_threshold=1)
+    result = run_universe_scan([good, stale], nifty, calendar=CAL, config=config)
+    stale_health = next(h for h in result.health if h.symbol == "STALESTOCK")
+    assert not stale_health.healthy
+    assert STALE_LATEST_BAR in stale_health.reason_codes
+    assert "STALESTOCK" not in [s.symbol for s in result.stage1_shortlist.bullish]
+    assert result.bullish.status == STATUS_UNIVERSE_WIDE  # GOODSTOCK is unaffected
+
+
+def test_symbol_matching_universe_latest_bar_is_still_scored_normally():
+    good = strong_bullish_symbol()
+    nifty = flat_nifty_15m()
+    config = ScanConfig(coverage_threshold=1)
+    result = run_universe_scan([good], nifty, calendar=CAL, config=config)
+    good_health = next(h for h in result.health if h.symbol == "GOODSTOCK")
+    assert good_health.healthy
+    assert good_health.reason_codes == ()
 
 
 # --- coverage threshold: PARTIAL vs NO_TRADE are never conflated ---
