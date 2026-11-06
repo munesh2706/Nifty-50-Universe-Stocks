@@ -10,6 +10,8 @@ import pytest
 
 from gate0.canonical_bars import IST
 from gate0.setup import (
+    BEARISH_EXECUTABLE_SHORT,
+    BEARISH_RESEARCH,
     ENTRY_TOO_EXTENDED,
     NO_DIRECTIONAL_EDGE,
     NO_FRESH_SETUP,
@@ -122,6 +124,45 @@ def test_bearish_rr_computed_correctly():
     assert result.eligible
     assert result.net_rr == pytest.approx(3.0)
     assert result.stop_price == 106.0
+
+
+# --- §5.6 bearish status ---
+
+def test_bullish_candidate_has_no_bearish_status():
+    zone = make_zone(state=STATE_TOUCHED, confirmed_ts=NORMAL + timedelta(minutes=10))
+    result = evaluate_setup("X", "up", structure_state="BULL", zone=zone, stage1_score=70, target_price=115.5)
+    assert result.bearish_status is None
+
+
+def test_bearish_candidate_defaults_to_research():
+    zone = make_zone(direction="down", proximal=103.0, distal=106.0,
+                     state=STATE_TOUCHED, confirmed_ts=NORMAL + timedelta(minutes=10))
+    result = evaluate_setup("X", "down", structure_state="BEAR", zone=zone, stage1_score=60, target_price=94.0)
+    assert result.bearish_status == BEARISH_RESEARCH
+
+
+def test_bearish_candidate_promoted_only_when_all_three_conditions_verified():
+    zone = make_zone(direction="down", proximal=103.0, distal=106.0,
+                     state=STATE_TOUCHED, confirmed_ts=NORMAL + timedelta(minutes=10))
+    partial = evaluate_setup("X", "down", structure_state="BEAR", zone=zone, stage1_score=60, target_price=94.0,
+                             same_day_window_verified=True, no_restriction_verified=True,
+                             liquidity_verified=False)
+    assert partial.bearish_status == BEARISH_RESEARCH  # one of three missing -> stays RESEARCH
+
+    full = evaluate_setup("X", "down", structure_state="BEAR", zone=zone, stage1_score=60, target_price=94.0,
+                          same_day_window_verified=True, no_restriction_verified=True,
+                          liquidity_verified=True)
+    assert full.bearish_status == BEARISH_EXECUTABLE_SHORT
+
+
+def test_bearish_status_never_promoted_based_on_directional_score_alone():
+    # A strongly eligible bearish setup must still default to RESEARCH --
+    # eligibility/score never substitutes for the three verified §5.6 conditions.
+    zone = make_zone(direction="down", proximal=103.0, distal=106.0,
+                     state=STATE_TOUCHED, confirmed_ts=NORMAL + timedelta(minutes=10))
+    result = evaluate_setup("X", "down", structure_state="BEAR", zone=zone, stage1_score=90, target_price=94.0)
+    assert result.eligible
+    assert result.bearish_status == BEARISH_RESEARCH
 
 
 def test_invalid_direction_raises():

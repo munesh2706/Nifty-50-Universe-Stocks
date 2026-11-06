@@ -26,6 +26,20 @@ A candidate failing any of the three is ineligible regardless of its Stage 1
 score (§4.8). The R:R numeric floor is a provisional research hypothesis,
 not a proven production value (§5.5) — explicitly configurable, not hard-
 coded as a locked constant.
+
+**§5.6 bearish status (acceptance criterion #12, previously unimplemented):**
+every bearish (`direction="down"`) candidate carries a `bearish_status`
+field. It defaults to `BEARISH_RESEARCH` — a bearish signal with no claim
+that it can be acted on as a short sale right now — and is promoted to
+`BEARISH_EXECUTABLE_SHORT` **only** when the caller explicitly verifies all
+three §5.6 conditions (same-day actionable window with a feasible
+square-off, no known broker/exchange restriction on this symbol today,
+liquidity/spread checks passing). None of those three conditions can be
+derived from bar data alone, so this module never infers them from the
+directional score or anything else in `evaluate_setup`'s own inputs — it
+only accepts the caller's already-verified booleans and defaults every one
+of them to "not verified." A bullish candidate's `bearish_status` is
+always `None` (the field does not apply).
 """
 from __future__ import annotations
 
@@ -36,6 +50,10 @@ from decimal import Decimal
 from gate0.zones import STATE_INVALIDATED, Zone
 
 NET_RR_PROVISIONAL_THRESHOLD = Decimal("1.5")  # research hypothesis (§5.5) -- not locked
+
+# §5.6 bearish status
+BEARISH_RESEARCH = "BEARISH_RESEARCH"
+BEARISH_EXECUTABLE_SHORT = "BEARISH_EXECUTABLE_SHORT"
 
 # §5.7 reason codes relevant to Stage 2 (per-candidate)
 NO_DIRECTIONAL_EDGE = "NO_DIRECTIONAL_EDGE"
@@ -61,6 +79,7 @@ class SetupEvaluation:
     net_rr: float | None
     eligible: bool
     reason_codes: tuple[str, ...]
+    bearish_status: str | None  # §5.6: BEARISH_RESEARCH | BEARISH_EXECUTABLE_SHORT for "down"; None for "up"
 
 
 def evaluate_setup(
@@ -73,12 +92,21 @@ def evaluate_setup(
     target_price: float | None,
     stop_buffer: float = 0.0,
     rr_threshold: Decimal = NET_RR_PROVISIONAL_THRESHOLD,
+    same_day_window_verified: bool = False,
+    no_restriction_verified: bool = False,
+    liquidity_verified: bool = False,
 ) -> SetupEvaluation:
     """§4.8: applies the three Stage 2 questions to one Stage 1 candidate's
     already-built zone. `target_price` must come from the symbol's own
     `structure.py` output (the next opposing confirmed swing/liquidity
     level) — pass `None` when no such level is objectively identified
     (§5.5), which alone makes the candidate ineligible on question 3.
+
+    For `direction="down"`, the three `*_verified` flags are the caller's
+    own already-confirmed answers to §5.6's three conditions — this
+    function never infers them. All three default to `False`, so a
+    bearish candidate is `BEARISH_RESEARCH` unless the caller explicitly
+    verified every condition.
     """
     if direction not in ("up", "down"):
         raise SetupInputError(f"invalid direction: {direction}")
@@ -119,10 +147,16 @@ def evaluate_setup(
     elif RR_BELOW_MINIMUM not in reasons:
         reasons.append(RR_BELOW_MINIMUM)  # no confirmed entry -> R:R cannot be established either
 
+    bearish_status: str | None = None
+    if direction == "down":
+        all_verified = same_day_window_verified and no_restriction_verified and liquidity_verified
+        bearish_status = BEARISH_EXECUTABLE_SHORT if all_verified else BEARISH_RESEARCH
+
     return SetupEvaluation(
         symbol=symbol, direction=direction, zone=zone, stage1_score=stage1_score,
         entry_price=entry_price, stop_price=stop_price, target_price=target_price,
         net_rr=net_rr, eligible=(len(reasons) == 0), reason_codes=tuple(reasons),
+        bearish_status=bearish_status,
     )
 
 

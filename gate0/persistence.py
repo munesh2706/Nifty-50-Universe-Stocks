@@ -158,6 +158,7 @@ def build_signal_record(
             "target_price": evaluation.target_price,
             "net_rr": evaluation.net_rr,
             "stage1_score_at_evaluation": evaluation.stage1_score,
+            "bearish_status": evaluation.bearish_status,
         }
 
     if trade_outcome is not None:

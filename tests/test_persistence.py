@@ -43,7 +43,7 @@ def make_evaluation() -> SetupEvaluation:
     zone = make_zone()
     return SetupEvaluation(symbol="GOODSTOCK", direction="up", zone=zone, stage1_score=75,
                            entry_price=106.0, stop_price=103.0, target_price=115.5,
-                           net_rr=3.17, eligible=True, reason_codes=())
+                           net_rr=3.17, eligible=True, reason_codes=(), bearish_status=None)
 
 
 def make_outcome() -> TradeOutcome:

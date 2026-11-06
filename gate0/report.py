@@ -65,8 +65,9 @@ def _fmt_final_candidates(result: ScanResult) -> list[str]:
             continue
         for c in dr.candidates:
             rr = "-" if c.net_rr is None else f"{c.net_rr:.2f}"
+            bearish_suffix = f" [{c.bearish_status}]" if c.bearish_status is not None else ""
             lines.append(f"  {c.symbol:<12} entry={c.entry_price} stop={c.stop_price} "
-                        f"target={c.target_price} net_rr={rr} stage1_score={c.stage1_score}")
+                        f"target={c.target_price} net_rr={rr} stage1_score={c.stage1_score}{bearish_suffix}")
     return lines
 
 
