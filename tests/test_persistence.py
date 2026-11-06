@@ -123,6 +123,19 @@ def test_build_signal_record_covers_required_sec8_fields():
     assert record["outcome"]["outcome"] == "WIN"
 
 
+def test_build_signal_record_carries_bearish_status():
+    # Review (ChatGPT, post-056): bearish_status must survive record creation.
+    bearish_zone = make_zone(direction="down")
+    bearish_eval = SetupEvaluation(symbol="BEARSTOCK", direction="down", zone=bearish_zone, stage1_score=60,
+                                   entry_price=103.0, stop_price=106.0, target_price=94.0,
+                                   net_rr=3.0, eligible=True, reason_codes=(), bearish_status="BEARISH_RESEARCH")
+    record = build_signal_record(
+        strategy_version="0.3.0", git_commit="abc123", config=ScanConfig(), symbol="BEARSTOCK",
+        direction="down", stage1_score=None, evaluation=bearish_eval, bar_references=[],
+    )
+    assert record["stage2"]["bearish_status"] == "BEARISH_RESEARCH"
+
+
 def test_build_signal_record_handles_missing_stage1_and_stage2_gracefully():
     record = build_signal_record(
         strategy_version="0.3.0", git_commit="abc123", config=ScanConfig(), symbol="X", direction="down",

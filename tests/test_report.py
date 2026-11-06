@@ -8,7 +8,9 @@ from datetime import datetime, timedelta
 from gate0.canonical_bars import IST, Bar
 from gate0.nse_calendar import SAMPLE_CALENDAR, TradingCalendar
 from gate0.report import render_text_report
-from gate0.scan import ScanConfig, SymbolBars, run_universe_scan
+from gate0.scan import DirectionResult, ScanConfig, ScanResult, SymbolBars, run_universe_scan
+from gate0.setup import SetupEvaluation
+from gate0.zones import STATE_TOUCHED, Zone
 
 NORMAL = datetime(2026, 11, 4, 9, 15, tzinfo=IST)
 CAL = TradingCalendar(SAMPLE_CALENDAR)
@@ -103,6 +105,27 @@ def test_report_never_crashes_on_an_all_unhealthy_universe():
     text = render_text_report(result)
     assert "(none)" in text
     assert "Coverage: 0/1 healthy" in text
+
+
+def test_report_shows_bearish_status_on_a_final_candidate():
+    # ChatGPT review (post-056): bearish_status must appear in the rendered
+    # final-candidate report, not just survive internally.
+    zone = Zone(zone_id="Z1", approach="B", direction="down", boundary_type="full_range",
+               proximal=103.0, distal=106.0, anchor_bar_id=None, displacement_id="D1",
+               created_ts=NORMAL, state=STATE_TOUCHED, touched_ts=NORMAL + timedelta(minutes=5),
+               confirmed_ts=NORMAL + timedelta(minutes=10), invalidated_ts=None, expired_ts=None)
+    bear_eval = SetupEvaluation(symbol="BEARSTOCK", direction="down", zone=zone, stage1_score=60,
+                                entry_price=103.0, stop_price=106.0, target_price=94.0,
+                                net_rr=3.0, eligible=True, reason_codes=(), bearish_status="BEARISH_RESEARCH")
+    from gate0.ranking import Shortlist
+    result = ScanResult(
+        healthy_count=1, total=1, health=(), rows=(),
+        stage1_shortlist=Shortlist(),
+        bullish=DirectionResult("up", "NO_TRADE", (), ("NO_DIRECTIONAL_EDGE",)),
+        bearish=DirectionResult("down", "UNIVERSE_WIDE", (bear_eval,), ()),
+    )
+    text = render_text_report(result)
+    assert "BEARISH_RESEARCH" in text
 
 
 def test_scan_result_rows_cover_every_supplied_symbol():
