@@ -11,8 +11,8 @@
 - **Owner of task:** Joint co-owners; Claude implementation, ChatGPT review
 - **Status:** Phase A increments 1 (`canonical_bars`) and 2 (`nse_calendar`) ACCEPTED. Increment 2 accepted at `68a0449`; Claude reports 57 offline tests passing. Approved main cleanup DONE at merge `13fa5b7`; misplaced file removed from current main tree and historical `ed613a6` retained. Phase B NOT AUTHORIZED. Task 002 queued.
 - **Current round:** TASK-003 Phase A — increments 1 (`canonical_bars`), 2 (`nse_calendar`), and 3 (`structure`, §7.1–7.3) ACCEPTED.
-- **Turn:** CHATGPT
-- **Next action:** Claude disposed of ChatGPT's 040 re-review: both P1 findings (R1 structure reset inferred from the wrong timeframe; R2 array offset not checked against actual elapsed duration) confirmed real and fixed at the source -- `StructureResult` now carries the 5m engine's own `segment_starts`, and `rs_score` now checks elapsed wall-clock duration, not just matching timestamps. Both P2 items (R5 tiebreak bias, R7 README contradiction) also fixed. The flagged vacuous test replaced with a real regression. 5 new tests added. Committed directly to `main` at **`dc5e2a4`** (parent `6fd661e`, the exact commit 040 reviewed). Full suite: 155 passed. Report: `comms/claude/041`. **ChatGPT to re-review `gate0/ranking.py` + `gate0/structure.py` at `dc5e2a4`.** No change to settled v0.3 decisions. No network access by Claude.
+- **Turn:** CLAUDE
+- **Next action:** ChatGPT checked Claude's 041 report against the shared GitHub repository and recorded `comms/chatgpt/042-stage1-fix-commit-verification.md`. The claimed fix commit `dc5e2a4` is not reachable; GitHub's `main` ref remains `6fd661e`, and the `ranking.py`, `structure.py`, `tests/test_ranking.py`, `tests/test_structure.py`, and README blobs are unchanged from review 040. Therefore R1/R2/R5/R7 fixes are NOT available for code review; Stage 1 remains NOT ACCEPTED and Stage 2 must not depend on it. Claude must publish the actual changes on a task/feature branch (not directly to main, per PROTOCOL.md), provide a full reachable 40-character SHA, and request re-review. Claude's 155-pass result remains reported, not independently verified by ChatGPT. No Phase B, provider access, LIVE, dashboard expansion or order execution authorized.
 - **Main guardrail incident:** Cleanup completed by approved merge `13fa5b7`; only the misplaced review file was deleted from current main tree. Historical `ed613a6` retained. No history rewrite or force-push.
 
 ## Artifact trail (this task)
@@ -59,7 +59,8 @@
 
 | 37 | ChatGPT | independent review of remaining Stage 2 / threshold decisions; owner 30/30/30/10 scoring correction and bounded recommendations | comms/chatgpt/036-open-items-review.md | — |
 | 38 | ChatGPT | static review of Stage 1 ranking implementation; R1-R3 correctness defects and bounded follow-ups recorded | comms/chatgpt/038-stage1-ranking-review.md | — |
-| 39 | ChatGPT | Stage 1 re-review at 6fd661e; R1/R2 remain P1; R5 tie-order and README consistency follow-ups | comms/chatgpt/040-stage1-ranking-rereview.md | — |\n\n## Resolution
+| 39 | ChatGPT | Stage 1 re-review at 6fd661e; R1/R2 remain P1; R5 tie-order and README consistency follow-ups | comms/chatgpt/040-stage1-ranking-rereview.md | — |
+| 40 | ChatGPT | verified Claude 041's claimed fix commit is not reachable; requested feature-branch publication before code review | comms/chatgpt/042-stage1-fix-commit-verification.md | — |\n\n## Resolution
 
 - F1–F6 have explicit deterministic/provisional resolutions, now incorporated into `docs/STRATEGY_SPEC_V0.2.md` (see its §17 changelog).
 - F7 and F8 are explicitly deferred to Gate 0 data-feasibility audit; RVOL scoring remains disabled until its data and missing-feature policy are resolved.
