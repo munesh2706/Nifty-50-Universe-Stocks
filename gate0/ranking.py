@@ -47,6 +47,14 @@ only compares relative-volume magnitude when BOTH tied candidates have an
 available ratio; otherwise the tie falls straight through to the
 alphabetical fallback, so an unavailable ratio never automatically loses to
 an available one.
+
+**Session-fragment completeness (review 044):** `trend_score` must not
+compute session VWAP from an incomplete session fragment and treat it as
+valid -- the smallest necessary precondition, reusing the `calendar`
+already passed in: the current segment's first bar must be that session's
+own first expected 15m slot per the calendar. If the session's own opening
+bar is missing from the supplied data, the symbol is UNAVAILABLE for this
+scan; no new readiness/recovery framework is introduced.
 """
 from __future__ import annotations
 
@@ -202,6 +210,18 @@ def trend_score(
 
     segments = _segment(window, calendar, "15m")
     current_segment = segments[-1] if segments else window
+
+    # Review 044: a VWAP computed from an incomplete session fragment (the
+    # session's own first expected slot missing from the supplied data) is
+    # not the real session VWAP and must not be treated as valid. Smallest
+    # precondition: the current segment's first bar must be the session's
+    # own first expected 15m slot, using the calendar already passed in --
+    # no new readiness/recovery framework.
+    seg_date = current_segment[0].bar_start_ts.date()
+    expected_first = calendar.expected_bar_starts(seg_date, "15m")[0]
+    if current_segment[0].bar_start_ts != expected_first:
+        return None  # incomplete session fragment -> fail closed, not a partial VWAP
+
     vwap = session_vwap(current_segment)
     seg_local_index = len(current_segment) - 1
     if vwap[seg_local_index] is None:

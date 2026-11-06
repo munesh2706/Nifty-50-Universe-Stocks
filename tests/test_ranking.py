@@ -101,29 +101,34 @@ def test_r2_misaligned_at_then_position_excludes_symbol():
 
 
 def test_r2_shared_missing_slot_does_not_mislabel_elapsed_duration():
-    # Review 040 R2: the SAME 15m slot (9:45) is missing from BOTH stock and
-    # Nifty series. Every "now"/"then" timestamp pair still matches exactly
-    # between the two series -- the R2-038 fix alone would accept this -- but
-    # the array offset no longer spans the intended elapsed duration: the
-    # bars_back=1 ("15m") interval is actually 30 minutes apart in wall-clock
-    # time. This must still be excluded.
+    # Review 044: the fixture must make every lookback INDEX exist (so the
+    # function cannot return None merely because an interval is unavailable)
+    # while the elapsed WALL-CLOCK duration for one of those intervals is
+    # wrong, because the identical 15m slot (9:45) is missing from BOTH
+    # stock and Nifty series. 5 bars: 09:15, 09:30, 10:00, 10:15, 10:30
+    # (09:45 dropped from both) -- at index=4 every one of bars_back
+    # (1, 2, 4) resolves to a valid array index, but bars_back=4 ("60m")
+    # actually spans 75 minutes (09:15 -> 10:30). The elapsed-duration
+    # check, not an unavailable-interval check, must be what excludes this.
     times = [NORMAL, NORMAL + timedelta(minutes=15)]
-    times += [NORMAL + timedelta(minutes=m) for m in (45, 60, 75, 90, 105, 120)]  # 9:45 dropped
-    closes = [100, 101, 102, 104, 108, 112, 115, 118]
+    times += [NORMAL + timedelta(minutes=m) for m in (45, 60, 75)]  # 9:45 dropped
+    closes = [100, 101, 102, 104, 108]
 
     def bars_at(times, closes, instrument):
         return [Bar(instrument, "15m", t, t + timedelta(minutes=15), c, c + 1, c - 1, c, 1000.0)
                 for t, c in zip(times, closes)]
 
     stock = bars_at(times, closes, "SYNTH")
-    nifty = bars_at(times, [100.0] * 8, "NIFTY50")
-    # "now" = idx 2 (9:45-slot's successor, 10:00), "then" (15m, bars_back=1) = idx 1 (9:30):
-    assert stock[2].bar_start_ts == nifty[2].bar_start_ts  # "now" matches
-    assert stock[1].bar_start_ts == nifty[1].bar_start_ts  # "then" also matches
-    # but the wall-clock gap between idx 1 and idx 2 is 30 minutes, not 15,
-    # because the 9:45 slot was dropped from both series:
-    assert (times[2] - times[1]) == timedelta(minutes=30)
-    result = rs_score(stock, nifty, index=2, direction="up")
+    nifty = bars_at(times, [100.0] * 5, "NIFTY50")
+    assert len(stock) == 5 and len(nifty) == 5
+    for bars_back in (1, 2, 4):
+        then_idx = 4 - bars_back
+        assert 0 <= then_idx < 5  # every lookback index exists -- not an availability gap
+        assert stock[then_idx].bar_start_ts == nifty[then_idx].bar_start_ts  # timestamps still match
+    # but the 60m ("bars_back=4") interval actually spans 75 minutes, because
+    # the 9:45 slot was dropped from both series:
+    assert (times[4] - times[0]) == timedelta(minutes=75)
+    result = rs_score(stock, nifty, index=4, direction="up")
     assert result is None
 
 
@@ -192,6 +197,18 @@ def test_r1_vwap_resets_at_session_boundary():
     actual_vwap = session_vwap(current_seg)[-1]
     assert actual_vwap == pytest.approx(expected_vwap_session2_only)
     assert actual_vwap < 60  # nowhere near session 1's ~100-124 range
+
+
+def test_r044_incomplete_session_fragment_rejected_not_scored():
+    # Review 044: the session's own first expected 15m slot (09:15) is
+    # missing -- the supplied data for this session starts at 09:30. VWAP
+    # computed from this fragment is NOT the real session VWAP and must not
+    # be treated as valid; the symbol must be UNAVAILABLE, not partially
+    # scored from a biased VWAP.
+    closes = [100 + i * 0.5 for i in range(24)]
+    bars = make_bars15(closes, start=NORMAL + timedelta(minutes=15))  # starts at 09:30
+    result = trend_score(bars, index=23, direction="up", calendar=CAL)
+    assert result is None
 
 
 def test_trend_score_rejects_non_15m_input():
